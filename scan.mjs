@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * scan.mjs â€” Zero-token portal scanner with a plugin-based provider layer.
+ * scan.mjs Ã¢â‚¬â€ Zero-token portal scanner with a plugin-based provider layer.
  *
  * Providers live in providers/*.mjs and are loaded at startup. Each provider
  * exports a default object with:
- *   - id: string â€” matched against `provider:` in portals.yml
- *   - detect(entry): {url}|null â€” optional auto-detection from careers_url
- *   - fetch(entry, ctx): [{title,url,company,location}] â€” required
+ *   - id: string Ã¢â‚¬â€ matched against `provider:` in portals.yml
+ *   - detect(entry): {url}|null Ã¢â‚¬â€ optional auto-detection from careers_url
+ *   - fetch(entry, ctx): [{title,url,company,location}] Ã¢â‚¬â€ required
  *
  * Files prefixed with _ are shared helpers (e.g. _http.mjs) and are never
  * loaded as providers. Adding a new HTTP/API source = drop a *.mjs into
@@ -16,9 +16,9 @@
  *
  * A tracked_companies entry can set `provider:` explicitly to bypass
  * URL-based auto-detection. The `transport:` field is reserved for future
- * transports â€” Phase A only ships the http transport.
+ * transports Ã¢â‚¬â€ Phase A only ships the http transport.
  *
- * Zero Claude API tokens â€” pure HTTP + JSON.
+ * Zero Claude API tokens Ã¢â‚¬â€ pure HTTP + JSON.
  *
  * Usage:
  *   node scan.mjs                  # scan all enabled companies
@@ -37,7 +37,7 @@ import { paths } from './lib/workops-paths.mjs';
 
 const parseYaml = yaml.load;
 
-// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const PORTALS_PATH = paths.portals;
 const SCAN_HISTORY_PATH = paths.scanHistory;
@@ -48,9 +48,27 @@ const PROVIDERS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 // Ensure required directories exist (fresh setup)
 mkdirSync(paths.dataDir, { recursive: true });
 
+function ensureTextFile(filePath, defaultContent) {
+  if (!existsSync(filePath)) {
+    writeFileSync(filePath, defaultContent, 'utf-8');
+  }
+}
+
+ensureTextFile(PIPELINE_PATH, "# Pipeline
+
+## Pendientes
+
+## Procesadas
+");
+ensureTextFile(APPLICATIONS_PATH, "# Applications
+
+| # | Date | Company | Role | Status | Link | Notes |
+|---|---|---|---|---|---|---|
+");
+
 const CONCURRENCY = 10;
 
-// â”€â”€ Provider loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Provider loading Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 async function loadProviders(dir) {
   const providers = new Map();
@@ -65,16 +83,16 @@ async function loadProviders(dir) {
     try {
       mod = await import(pathToFileURL(full).href);
     } catch (err) {
-      console.error(`âš ï¸  ${file}: failed to load â€” ${err.message}`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  ${file}: failed to load Ã¢â‚¬â€ ${err.message}`);
       continue;
     }
     const p = mod.default;
     if (!p || typeof p.fetch !== 'function' || !p.id) {
-      console.error(`âš ï¸  ${file}: skipping â€” default export must be { id, fetch }`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  ${file}: skipping Ã¢â‚¬â€ default export must be { id, fetch }`);
       continue;
     }
     if (providers.has(p.id)) {
-      console.error(`âš ï¸  ${file}: duplicate provider id "${p.id}" â€” keeping first`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  ${file}: duplicate provider id "${p.id}" Ã¢â‚¬â€ keeping first`);
       continue;
     }
     providers.set(p.id, p);
@@ -99,7 +117,7 @@ function resolveProvider(entry, providers, { skipIds = [] } = {}) {
       const hit = localParser.detect?.(entry);
       if (hit) return { provider: localParser };
     } catch (err) {
-      console.error(`âš ï¸  local-parser: detect() threw for "${entry.name}" â€” ${err.message}`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  local-parser: detect() threw for "${entry.name}" Ã¢â‚¬â€ ${err.message}`);
     }
   }
 
@@ -109,7 +127,7 @@ function resolveProvider(entry, providers, { skipIds = [] } = {}) {
     try {
       hit = p.detect?.(entry);
     } catch (err) {
-      console.error(`âš ï¸  ${p.id}: detect() threw for "${entry.name}" â€” ${err.message}`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  ${p.id}: detect() threw for "${entry.name}" Ã¢â‚¬â€ ${err.message}`);
       continue;
     }
     if (hit) return { provider: p };
@@ -117,7 +135,7 @@ function resolveProvider(entry, providers, { skipIds = [] } = {}) {
   return null;
 }
 
-// â”€â”€ Title filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Title filter Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function buildTitleFilter(titleFilter) {
   const positive = (titleFilter?.positive || []).map(k => k.toLowerCase());
@@ -131,22 +149,22 @@ function buildTitleFilter(titleFilter) {
   };
 }
 
-// â”€â”€ Location filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Location filter Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Optional. If `location_filter` is absent from portals.yml, all locations pass.
 // Semantics (case-insensitive substring, in this order):
-//   - Empty / whitespace-only / non-string location â†’ pass (don't penalize
+//   - Empty / whitespace-only / non-string location Ã¢â€ â€™ pass (don't penalize
 //     missing or malformed provider data)
-//   - `always_allow` matches â†’ pass (takes precedence over `block` â€” lets a
+//   - `always_allow` matches Ã¢â€ â€™ pass (takes precedence over `block` Ã¢â‚¬â€ lets a
 //     multi-location string like "Remote, Belgium or France" through because
 //     the home region is an option, even though "france" is blocked)
-//   - `block` matches â†’ reject
-//   - `allow` empty â†’ pass (already cleared block)
-//   - `allow` non-empty â†’ must match at least one keyword
+//   - `block` matches Ã¢â€ â€™ reject
+//   - `allow` empty Ã¢â€ â€™ pass (already cleared block)
+//   - `allow` non-empty Ã¢â€ â€™ must match at least one keyword
 
 // Normalize a keyword list from portals.yml: tolerates a bare string
-// (wrapped to a 1-item array), null/undefined (â†’ []), and non-string
+// (wrapped to a 1-item array), null/undefined (Ã¢â€ â€™ []), and non-string
 // entries (filtered out). Survivors are lowercased, trimmed, and any
-// resulting empty strings are dropped â€” an empty keyword would otherwise
+// resulting empty strings are dropped Ã¢â‚¬â€ an empty keyword would otherwise
 // match every location via String.includes(''), silently bypassing the
 // other tiers.
 function normalizeKeywordList(value) {
@@ -174,7 +192,7 @@ export function buildLocationFilter(locationFilter) {
   };
 }
 
-// â”€â”€ Dedup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Dedup Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function loadSeenUrls() {
   const seen = new Set();
@@ -188,7 +206,7 @@ function loadSeenUrls() {
     }
   }
 
-  // pipeline.md â€” extract URLs from checkbox lines
+  // pipeline.md Ã¢â‚¬â€ extract URLs from checkbox lines
   if (existsSync(PIPELINE_PATH)) {
     const text = readFileSync(PIPELINE_PATH, 'utf-8');
     for (const match of text.matchAll(/- \[[ x]\] (https?:\/\/\S+)/g)) {
@@ -196,7 +214,7 @@ function loadSeenUrls() {
     }
   }
 
-  // applications.md â€” extract URLs from report links and any inline URLs
+  // applications.md Ã¢â‚¬â€ extract URLs from report links and any inline URLs
   if (existsSync(APPLICATIONS_PATH)) {
     const text = readFileSync(APPLICATIONS_PATH, 'utf-8');
     for (const match of text.matchAll(/https?:\/\/[^\s|)]+/g)) {
@@ -223,7 +241,7 @@ function loadSeenCompanyRoles() {
   return seen;
 }
 
-// â”€â”€ Pipeline writer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Pipeline writer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function appendToPipeline(offers) {
   if (offers.length === 0) return;
@@ -234,7 +252,7 @@ function appendToPipeline(offers) {
   const marker = '## Pendientes';
   const idx = text.indexOf(marker);
   if (idx === -1) {
-    // No Pendientes section â€” append at end before Procesadas
+    // No Pendientes section Ã¢â‚¬â€ append at end before Procesadas
     const procIdx = text.indexOf('## Procesadas');
     const insertAt = procIdx === -1 ? text.length : procIdx;
     const block = `\n${marker}\n\n` + offers.map(o =>
@@ -258,7 +276,7 @@ function appendToPipeline(offers) {
 
 function appendToScanHistory(offers, date, status = 'added') {
   // Ensure file + header exist. Location appended as 7th column for non-breaking
-  // backward compat â€” older scan-history.tsv files with 6 columns still parse fine
+  // backward compat Ã¢â‚¬â€ older scan-history.tsv files with 6 columns still parse fine
   // since loadSeenUrls only reads column 0. `status` is parameterized so callers
   // can record verify outcomes (`skipped_expired`, etc.) without the legacy
   // `(expired)` suffix in `source`.
@@ -273,7 +291,7 @@ function appendToScanHistory(offers, date, status = 'added') {
   appendFileSync(SCAN_HISTORY_PATH, lines, 'utf-8');
 }
 
-// â”€â”€ Parallel fetch with concurrency limit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Parallel fetch with concurrency limit Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 async function parallelFetch(tasks, limit) {
   const results = [];
@@ -291,7 +309,7 @@ async function parallelFetch(tasks, limit) {
   return results;
 }
 
-// â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Main Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 async function verifyOffers(offers) {
   // Dynamic imports keep the default zero-token path free of Playwright startup
@@ -318,12 +336,12 @@ async function verifyOffers(offers) {
   }
 
   // Three permanent buckets + one transient passthrough:
-  //   verified  â†’ active pages and transient nav errors (retry next scan)
-  //   expired   â†’ classifier-confirmed dead postings (HTTP 4xx, redirect markers,
+  //   verified  Ã¢â€ â€™ active pages and transient nav errors (retry next scan)
+  //   expired   Ã¢â€ â€™ classifier-confirmed dead postings (HTTP 4xx, redirect markers,
   //               body patterns, listing pages, insufficient content)
-  //   dropped   â†’ page loaded but classifier saw no Apply control. --verify is an
+  //   dropped   Ã¢â€ â€™ page loaded but classifier saw no Apply control. --verify is an
   //               opt-in stricter filter; keeping these defeats the purpose.
-  //   invalid   â†’ up-front URL guard rejections (malformed / non-http / private)
+  //   invalid   Ã¢â€ â€™ up-front URL guard rejections (malformed / non-http / private)
   const verified = [];
   const expired = [];
   const dropped = [];
@@ -331,28 +349,28 @@ async function verifyOffers(offers) {
 
   try {
     const page = await browser.newPage();
-    // Sequential â€” project rule: never Playwright in parallel
+    // Sequential Ã¢â‚¬â€ project rule: never Playwright in parallel
     for (const offer of offers) {
       const { result, code, reason } = await checkUrlLiveness(page, offer.url);
       if (result === 'expired') {
         expired.push({ ...offer, reason });
-        console.log(`  âŒ expired   ${offer.company} | ${offer.title} (${reason})`);
+        console.log(`  Ã¢ÂÅ’ expired   ${offer.company} | ${offer.title} (${reason})`);
       } else if (result === 'uncertain' && GUARD_CODES.has(code)) {
-        // Guard failures are permanent (not transient like a timeout) â€” record them
+        // Guard failures are permanent (not transient like a timeout) Ã¢â‚¬â€ record them
         // separately so they don't end up in pipeline.md but DO appear in scan-history
         // with a precise status, dedup-blocking them on subsequent scans.
         invalid.push({ ...offer, code, reason });
-        console.log(`  â›” invalid   ${offer.company} | ${offer.title} (${reason})`);
+        console.log(`  Ã¢â€ºâ€ invalid   ${offer.company} | ${offer.title} (${reason})`);
       } else if (result === 'uncertain' && code === 'no_apply_control') {
         // Page loaded but classifier could not find an Apply control. Treat like
-        // expired for routing â€” drop from pipeline AND record in scan-history so
+        // expired for routing Ã¢â‚¬â€ drop from pipeline AND record in scan-history so
         // we don't burn a verify cycle on the same URL next scan.
         dropped.push({ ...offer, reason });
-        console.log(`  âš ï¸ no-apply  ${offer.company} | ${offer.title} (${reason})`);
+        console.log(`  Ã¢Å¡Â Ã¯Â¸Â no-apply  ${offer.company} | ${offer.title} (${reason})`);
       } else {
-        // 'active' or 'uncertain' due to navigation_error (transient â€” retry next scan)
+        // 'active' or 'uncertain' due to navigation_error (transient Ã¢â‚¬â€ retry next scan)
         verified.push(offer);
-        const icon = result === 'active' ? 'âœ…' : 'âš ï¸';
+        const icon = result === 'active' ? 'Ã¢Å“â€¦' : 'Ã¢Å¡Â Ã¯Â¸Â';
         console.log(`  ${icon} ${result.padEnd(9)} ${offer.company} | ${offer.title}`);
       }
     }
@@ -408,7 +426,7 @@ async function main() {
     if (!company || typeof company !== 'object') continue;
     if (company.enabled === false) continue;
     if (typeof company.name !== 'string' || !company.name.trim()) {
-      console.error(`âš ï¸  Skipping entry â€” missing or non-string 'name' field: ${JSON.stringify(company)}`);
+      console.error(`Ã¢Å¡Â Ã¯Â¸Â  Skipping entry Ã¢â‚¬â€ missing or non-string 'name' field: ${JSON.stringify(company)}`);
       continue;
     }
     if (filterCompany && !company.name.toLowerCase().includes(filterCompany)) continue;
@@ -419,8 +437,8 @@ async function main() {
   }
 
   const localParserCount = targets.filter(t => t._provider.id === 'local-parser').length;
-  console.log(`Scanning ${targets.length} companies via providers (${localParserCount} local parser; ${skippedCount} skipped â€” no provider matched)`);
-  if (dryRun) console.log('(dry run â€” no files will be written)\n');
+  console.log(`Scanning ${targets.length} companies via providers (${localParserCount} local parser; ${skippedCount} skipped Ã¢â‚¬â€ no provider matched)`);
+  if (dryRun) console.log('(dry run Ã¢â‚¬â€ no files will be written)\n');
 
   // 4. Load dedup sets
   const seenUrls = loadSeenUrls();
@@ -490,7 +508,7 @@ async function main() {
 
   await parallelFetch(tasks, CONCURRENCY);
 
-  // 5.5. Optional liveness verification â€” drop expired and guard-rejected postings
+  // 5.5. Optional liveness verification Ã¢â‚¬â€ drop expired and guard-rejected postings
   let verifiedOffers = newOffers;
   let expiredOffers = [];
   let droppedOffers = [];
@@ -534,9 +552,9 @@ async function main() {
   }
 
   // 7. Print summary
-  console.log(`\n${'â”'.repeat(45)}`);
-  console.log(`Portal Scan â€” ${date}`);
-  console.log(`${'â”'.repeat(45)}`);
+  console.log(`\n${'Ã¢â€Â'.repeat(45)}`);
+  console.log(`Portal Scan Ã¢â‚¬â€ ${date}`);
+  console.log(`${'Ã¢â€Â'.repeat(45)}`);
   console.log(`Companies scanned:     ${targets.length}`);
   console.log(`Total jobs found:      ${totalFound}`);
   console.log(`Filtered by title:     ${totalFilteredTitle} removed`);
@@ -552,7 +570,7 @@ async function main() {
   if (errors.length > 0) {
     console.log(`\nErrors (${errors.length}):`);
     for (const e of errors) {
-      console.log(`  âœ— ${e.company}: ${e.error}`);
+      console.log(`  Ã¢Å“â€” ${e.company}: ${e.error}`);
     }
   }
 
@@ -562,14 +580,14 @@ async function main() {
       console.log(`  + ${o.company} | ${o.title} | ${o.location || 'N/A'}`);
     }
     if (dryRun) {
-      console.log('\n(dry run â€” run without --dry-run to save results)');
+      console.log('\n(dry run Ã¢â‚¬â€ run without --dry-run to save results)');
     } else {
       console.log(`\nResults saved to ${PIPELINE_PATH} and ${SCAN_HISTORY_PATH}`);
     }
   }
 
-  console.log(`\nâ†’ Run /career-ops pipeline to evaluate new offers.`);
-  console.log('â†’ Share results and get help: https://discord.gg/8pRpHETxa4');
+  console.log(`\nÃ¢â€ â€™ Run /career-ops pipeline to evaluate new offers.`);
+  console.log('Ã¢â€ â€™ Share results and get help: https://discord.gg/8pRpHETxa4');
 }
 
 // Only run main() when invoked directly (`node scan.mjs`), not when imported by tests.
