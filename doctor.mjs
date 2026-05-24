@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * doctor.mjs — Setup validation for career-ops
+ * doctor.mjs — Setup validation for career-ops / WorkOps
  * Checks all prerequisites and prints a pass/fail checklist.
  */
 
 import { existsSync, mkdirSync, readdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = __dirname;
+import {
+  paths,
+  workopsDataDir,
+  workopsRunsDir,
+  workopsModeEnabled,
+} from './lib/workops-paths.mjs';
 
 // ANSI colors (only on TTY)
 const isTTY = process.stdout.isTTY;
 const green = (s) => isTTY ? `\x1b[32m${s}\x1b[0m` : s;
 const red = (s) => isTTY ? `\x1b[31m${s}\x1b[0m` : s;
 const dim = (s) => isTTY ? `\x1b[2m${s}\x1b[0m` : s;
+
+function locationSuffix(filePath) {
+  return workopsModeEnabled() ? ` at ${filePath}` : '';
+}
 
 function checkNodeVersion() {
   const major = parseInt(process.versions.node.split('.')[0]);
@@ -31,7 +37,7 @@ function checkNodeVersion() {
 }
 
 function checkDependencies() {
-  if (existsSync(join(projectRoot, 'node_modules'))) {
+  if (existsSync(paths.nodeModulesDir)) {
     return { pass: true, label: 'Dependencies installed' };
   }
   return {
@@ -63,49 +69,55 @@ async function checkPlaywright() {
 }
 
 function checkCv() {
-  if (existsSync(join(projectRoot, 'cv.md'))) {
-    return { pass: true, label: 'cv.md found' };
+  if (existsSync(paths.cv)) {
+    return { pass: true, label: `cv.md found${locationSuffix(paths.cv)}` };
   }
   return {
     pass: false,
-    label: 'cv.md not found',
+    label: `cv.md not found${locationSuffix(paths.cv)}`,
     fix: [
-      'Create cv.md in the project root with your CV in markdown',
+      workopsModeEnabled()
+        ? `Create ${paths.cv} with your CV in markdown`
+        : 'Create cv.md in the project root with your CV in markdown',
       'See examples/ for reference CVs',
     ],
   };
 }
 
 function checkProfile() {
-  if (existsSync(join(projectRoot, 'config', 'profile.yml'))) {
-    return { pass: true, label: 'config/profile.yml found' };
+  if (existsSync(paths.profileYml)) {
+    return { pass: true, label: `config/profile.yml found${locationSuffix(paths.profileYml)}` };
   }
   return {
     pass: false,
-    label: 'config/profile.yml not found',
+    label: `config/profile.yml not found${locationSuffix(paths.profileYml)}`,
     fix: [
-      'Run: cp config/profile.example.yml config/profile.yml',
+      workopsModeEnabled()
+        ? `Create ${paths.profileYml}`
+        : 'Run: cp config/profile.example.yml config/profile.yml',
       'Then edit it with your details',
     ],
   };
 }
 
 function checkPortals() {
-  if (existsSync(join(projectRoot, 'portals.yml'))) {
-    return { pass: true, label: 'portals.yml found' };
+  if (existsSync(paths.portals)) {
+    return { pass: true, label: `portals.yml found${locationSuffix(paths.portals)}` };
   }
   return {
     pass: false,
-    label: 'portals.yml not found',
+    label: `portals.yml not found${locationSuffix(paths.portals)}`,
     fix: [
-      'Run: cp templates/portals.example.yml portals.yml',
+      workopsModeEnabled()
+        ? `Create ${paths.portals}`
+        : 'Run: cp templates/portals.example.yml portals.yml',
       'Then customize with your target companies',
     ],
   };
 }
 
 function checkFonts() {
-  const fontsDir = join(projectRoot, 'fonts');
+  const fontsDir = paths.fontsDir;
   if (!existsSync(fontsDir)) {
     return {
       pass: false,
@@ -132,19 +144,18 @@ function checkFonts() {
   return { pass: true, label: 'Fonts directory ready' };
 }
 
-function checkAutoDir(name) {
-  const dirPath = join(projectRoot, name);
+function checkAutoDir(name, dirPath) {
   if (existsSync(dirPath)) {
-    return { pass: true, label: `${name}/ directory ready` };
+    return { pass: true, label: `${name}/ directory ready${locationSuffix(dirPath)}` };
   }
   try {
     mkdirSync(dirPath, { recursive: true });
-    return { pass: true, label: `${name}/ directory ready (auto-created)` };
+    return { pass: true, label: `${name}/ directory ready (auto-created)${locationSuffix(dirPath)}` };
   } catch {
     return {
       pass: false,
-      label: `${name}/ directory could not be created`,
-      fix: `Run: mkdir ${name}`,
+      label: `${name}/ directory could not be created${locationSuffix(dirPath)}`,
+      fix: `Run: mkdir ${dirPath}`,
     };
   }
 }
@@ -152,6 +163,13 @@ function checkAutoDir(name) {
 async function main() {
   console.log('\ncareer-ops doctor');
   console.log('================\n');
+
+  if (workopsModeEnabled()) {
+    console.log('WorkOps external paths enabled');
+    if (workopsDataDir) console.log(`Data dir: ${workopsDataDir}`);
+    if (workopsRunsDir) console.log(`Runs dir: ${workopsRunsDir}`);
+    console.log('');
+  }
 
   const checks = [
     checkNodeVersion(),
@@ -161,9 +179,9 @@ async function main() {
     checkProfile(),
     checkPortals(),
     checkFonts(),
-    checkAutoDir('data'),
-    checkAutoDir('output'),
-    checkAutoDir('reports'),
+    checkAutoDir('data', paths.dataDir),
+    checkAutoDir('output', paths.outputDir),
+    checkAutoDir('reports', paths.reportsDir),
   ];
 
   let failures = 0;
@@ -186,9 +204,7 @@ async function main() {
     console.log(`Result: ${failures} issue${failures === 1 ? '' : 's'} found. Fix them and run \`npm run doctor\` again.`);
     process.exit(1);
   } else {
-    console.log('Result: All checks passed. You\'re ready to go! Run `claude` to start.');
-    console.log('');
-    console.log('Join the community: https://discord.gg/8pRpHETxa4');
+    console.log('Result: All checks passed. You\'re ready to go!');
     process.exit(0);
   }
 }
