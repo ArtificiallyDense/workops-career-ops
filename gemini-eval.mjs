@@ -59,6 +59,7 @@ const PATHS = {
   cv:          workopsPaths.cv,
   profile:     join(ROOT, 'modes', '_profile.md'),
   profileYml:  workopsPaths.profileYml,
+  proofLibrary: workopsPaths.proofLibrary,
   reports:     workopsPaths.reportsDir,
   tracker:     workopsPaths.applications,
 };
@@ -182,6 +183,7 @@ const ofertaLogic    = readFile(PATHS.oferta,      'modes/oferta.md');
 const cvContent      = readFile(PATHS.cv,          'cv.md');
 const profileContent = readFile(PATHS.profile,     'modes/_profile.md');
 const profileYml     = readFile(PATHS.profileYml,  'config/profile.yml');
+const proofLibrary   = readFile(PATHS.proofLibrary, 'proof-library/asad-master-proof.md');
 
 // ---------------------------------------------------------------------------
 // Build the system prompt (mirrors the Claude skill router logic)
