@@ -18,7 +18,8 @@
                     "patterns":  "node analyze-patterns.mjs",
                     "gemini:eval":  "node gemini-eval.mjs",
                     "workops:eval-url":  "node workops-eval-url.mjs",
-                    "workops:review":  "node workops-review.mjs"
+                    "workops:review":  "node workops-review.mjs",
+                    "workops:package":  "node workops-package.mjs"
                 },
     "keywords":  [
                      "ai",
