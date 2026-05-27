@@ -78,7 +78,10 @@ const allReports = readdirSync(reportsDir)
   .filter((name) => name.endsWith('.md'))
   .map((name) => parseReport(join(reportsDir, name)))
   .filter((r) => r.score > 0)
-  .filter((r) => r.company.length <= 60);
+  .filter((r) => r.company.length <= 60)
+  .filter((r) => r.role.length <= 90)
+  .filter((r) => !r.role.includes('|'))
+  .filter((r) => r.score >= 2.5);
 
 const bestByRole = new Map();
 

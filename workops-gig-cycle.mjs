@@ -73,23 +73,35 @@ function evalKey(company, role) {
   return `${clean(company).toLowerCase()}::${clean(role).toLowerCase()}`;
 }
 
-function evaluatedKeys() {
-  const keys = new Set();
+function normalizeUrl(url) {
+  return String(url || '')
+    .replace(/\?.*$/, '')
+    .replace(/#.*$/, '')
+    .replace(/\/$/, '')
+    .toLowerCase()
+    .trim();
+}
 
-  if (!existsSync(paths.reportsDir)) return keys;
+function evaluatedHistory() {
+  const keys = new Set();
+  const urls = new Set();
+
+  if (!existsSync(paths.reportsDir)) return { keys, urls };
 
   for (const file of readdirSync(paths.reportsDir).filter((name) => name.endsWith('.md'))) {
     const text = readFileSync(join(paths.reportsDir, file), 'utf8');
     const header = extractHeader(text);
     const company = extractSummaryField(text, 'COMPANY') || header.company;
     const role = extractSummaryField(text, 'ROLE') || header.role;
+    const urlMatch = text.match(/\*\*URL:\*\*\s*(https?:\/\/\S+)/i) || text.match(/URL:\s*(https?:\/\/\S+)/i);
+    if (urlMatch) urls.add(normalizeUrl(urlMatch[1]));
 
     if (company && role && company.length <= 80) {
       keys.add(evalKey(company, role));
     }
   }
 
-  return keys;
+  return { keys, urls };
 }
 
 function textOf(lead) {
@@ -159,13 +171,27 @@ const hardBad = [
   'frontend',
   'devops',
   'microbiology',
-  'pmhnp'
+  'pmhnp',
+  'proofreader',
+  'pharmaceutical proofreader',
+  'founders associate',
+  'working student',
+  'werkstudent',
+  'praktikant',
+  'praktikum',
+  'intern',
+  'internship',
+  'city scout',
+  'gerente de opera'
 ];
 
 const weakTerms = [
   'werkstudent',
+  'working student',
   'praktikant',
   'praktikum',
+  'intern',
+  'internship',
   'german speaker',
   'native german',
   'deutsch',
@@ -220,7 +246,7 @@ if (!existsSync(leadsPath)) {
 console.log('');
 console.log('Step 2/4: Build smart shortlist and skip already evaluated leads...');
 
-const done = evaluatedKeys();
+const done = evaluatedHistory();
 const leads = JSON.parse(readFileSync(leadsPath, 'utf8'));
 
 const shortlist = leads
@@ -229,9 +255,11 @@ const shortlist = leads
     const text = textOf(lead);
 
     if (hardBad.some((bad) => title.includes(bad))) return false;
+    if (weakTerms.some((term) => text.includes(term))) return false;
+    if (/proofreader|pharmaceutical|medical|physio|founders associate|city scout|working student|werkstudent|praktikant|praktikum|internship|native german|german speaker|deutsch|remote in de/i.test(text)) return false;
     if (!hardGood.some((good) => text.includes(good))) return false;
 
-    return includeEvaluated || !done.has(evalKey(lead.company, lead.title));
+    return includeEvaluated || (!done.keys.has(evalKey(lead.company, lead.title)) && !done.urls.has(normalizeUrl(lead.url)));
   })
   .map((lead) => ({
     ...lead,
@@ -272,6 +300,7 @@ const selected = noEval
   ? []
   : shortlist
       .filter((lead) => lead.shortlist_score >= evalMinScore)
+      .filter((lead) => !/werkstudent|working student|praktikant|praktikum|intern|internship|native german|german speaker|remote in de/i.test(textOf(lead)))
       .slice(0, maxEval);
 
 if (selected.length === 0) {
