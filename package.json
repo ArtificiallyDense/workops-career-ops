@@ -19,7 +19,8 @@
                     "gemini:eval":  "node gemini-eval.mjs",
                     "workops:eval-url":  "node workops-eval-url.mjs",
                     "workops:review":  "node workops-review.mjs",
-                    "workops:package":  "node workops-package.mjs"
+                    "workops:package":  "node workops-package.mjs",
+                    "workops:eval-pipeline":  "node workops-eval-pipeline.mjs"
                 },
     "keywords":  [
                      "ai",
