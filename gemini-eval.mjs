@@ -31,6 +31,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { paths as workopsPaths } from './lib/workops-paths.mjs';
 
 // ---------------------------------------------------------------------------
 // Bootstrap: load .env before anything else
@@ -55,11 +56,11 @@ const PATHS = {
   oferta:      join(ROOT, 'modes', 'oferta.md'),
   // Canonical skill path referenced in Issue #344
   evaluate:    join(ROOT, '.claude', 'skills', 'career-ops', 'SKILL.md'),
-  cv:          join(ROOT, 'cv.md'),
+  cv:          workopsPaths.cv,
   profile:     join(ROOT, 'modes', '_profile.md'),
-  profileYml:  join(ROOT, 'config', 'profile.yml'),
-  reports:     join(ROOT, 'reports'),
-  tracker:     join(ROOT, 'data', 'applications.md'),
+  profileYml:  workopsPaths.profileYml,
+  reports:     workopsPaths.reportsDir,
+  tracker:     workopsPaths.applications,
 };
 
 // ---------------------------------------------------------------------------
