@@ -20,7 +20,10 @@
                     "workops:eval-url":  "node workops-eval-url.mjs",
                     "workops:review":  "node workops-review.mjs",
                     "workops:package":  "node workops-package.mjs",
-                    "workops:eval-pipeline":  "node workops-eval-pipeline.mjs"
+                    "workops:eval-pipeline":  "node workops-eval-pipeline.mjs",
+                    "workops:gig-discover":  "node workops-gig-discover.mjs",
+                    "workops:gig-shortlist":  "node workops-gig-shortlist.mjs",
+                    "workops:gig-cycle":  "node workops-gig-cycle.mjs"
                 },
     "keywords":  [
                      "ai",
