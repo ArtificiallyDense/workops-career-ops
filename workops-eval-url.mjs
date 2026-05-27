@@ -9,8 +9,18 @@ const url = args.find((arg) => !arg.startsWith('--'));
 const modelIndex = args.indexOf('--model');
 const model = modelIndex >= 0 ? args[modelIndex + 1] : (process.env.GEMINI_MODEL || 'gemini-3.5-flash');
 
-if (!url) {
-  console.error('Usage: npm run workops:eval-url -- <JOB_URL> [--model gemini-3.5-flash]');
+if (!url || url === 'JOB_URL') {
+  console.error('Usage: npm run workops:eval-url -- "https://example.com/job-post" --model gemini-3.5-flash');
+  console.error('');
+  console.error('Replace JOB_URL with a real job posting URL.');
+  process.exit(1);
+}
+
+try {
+  new URL(url);
+} catch {
+  console.error(`Invalid URL: ${url}`);
+  console.error('Use a full URL starting with https://');
   process.exit(1);
 }
 
