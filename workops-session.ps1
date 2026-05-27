@@ -1,0 +1,5 @@
+﻿$env:WORKOPS_DATA_DIR="D:\WorkOps\data"
+$env:WORKOPS_RUNS_DIR="D:\WorkOps\runs"
+Write-Host "WorkOps paths loaded:"
+Write-Host "DATA: $env:WORKOPS_DATA_DIR"
+Write-Host "RUNS: $env:WORKOPS_RUNS_DIR"
