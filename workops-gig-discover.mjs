@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { paths } from './lib/workops-paths.mjs';
 
@@ -97,6 +97,13 @@ const badKeywords = [
   'software engineer', 'backend', 'frontend', 'devops', 'nurse', 'doctor',
   'java developer', 'data engineer', 'account executive', 'sales executive'
 ];
+
+const gigSources = loadGigSources();
+addUnique(goodTitle, gigSources.positive_terms);
+addUnique(greatContext, gigSources.context_terms);
+addUnique(badTitle, gigSources.negative_terms);
+addUnique(locationRisk, gigSources.location_risks);
+addUnique(serpQueries, gigSources.search_queries);
 
 function stripHtml(html = '') {
   return String(html)

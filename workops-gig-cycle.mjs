@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { spawnSync } from 'child_process';
 import { paths } from './lib/workops-paths.mjs';
+import yaml from 'js-yaml';
 
 const args = process.argv.slice(2);
 
@@ -19,6 +20,25 @@ const minutes = Number.parseFloat(argValue('--minutes', '8'));
 const model = argValue('--model', process.env.GEMINI_MODEL_GIGS || process.env.GEMINI_MODEL || 'gemini-3.5-flash');
 const includeEvaluated = args.includes('--include-evaluated');
 const noEval = args.includes('--no-eval');
+
+function loadGigSources() {
+  const configPath = join(paths.dataDir, 'config', 'gig-sources.yml');
+  if (!existsSync(configPath)) return {};
+  try {
+    return yaml.load(readFileSync(configPath, 'utf8')) || {};
+  } catch (error) {
+    console.warn(`Could not load gig sources config: ${error.message}`);
+    return {};
+  }
+}
+
+function addUnique(list, items = []) {
+  for (const item of items || []) {
+    if (typeof item === 'string' && item.trim() && !list.includes(item.trim())) {
+      list.push(item.trim());
+    }
+  }
+}
 
 function runNode(script, scriptArgs = []) {
   if (!existsSync(script)) {
@@ -274,6 +294,11 @@ const weakTerms = [
   'in-person shoots',
   'must be based'
 ];
+
+const cycleGigSources = loadGigSources();
+addUnique(hardGood, cycleGigSources.positive_terms);
+addUnique(hardBad, cycleGigSources.negative_terms);
+addUnique(weakTerms, cycleGigSources.weak_terms);
 
 function bonusScore(lead) {
   const text = textOf(lead);
