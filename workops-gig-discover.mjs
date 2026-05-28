@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { paths } from './lib/workops-paths.mjs';
+import yaml from 'js-yaml';
 
 const args = process.argv.slice(2);
 
@@ -98,12 +99,42 @@ const badKeywords = [
   'java developer', 'data engineer', 'account executive', 'sales executive'
 ];
 
-const gigSources = loadGigSources();
-addUnique(goodTitle, gigSources.positive_terms);
-addUnique(greatContext, gigSources.context_terms);
-addUnique(badTitle, gigSources.negative_terms);
-addUnique(locationRisk, gigSources.location_risks);
-addUnique(serpQueries, gigSources.search_queries);
+
+function loadGigSources() {
+  const configPath = join(paths.dataDir, 'config', 'gig-sources.yml');
+  if (!existsSync(configPath)) return {};
+  try {
+    return yaml.load(readFileSync(configPath, 'utf8')) || {};
+  } catch (error) {
+    console.warn(`Could not load gig sources config: ${error.message}`);
+    return {};
+  }
+}
+
+let gigSourcesApplied = false;
+
+function applyGigSourcesConfig() {
+  if (gigSourcesApplied) return;
+  const gigSources = loadGigSources();
+
+  addUnique(goodKeywords, gigSources.positive_terms);
+  addUnique(goodKeywords, gigSources.context_terms);
+  addUnique(badKeywords, gigSources.negative_terms);
+  addUnique(badKeywords, gigSources.location_risks);
+  addUnique(badKeywords, gigSources.weak_terms);
+  // serpQueries not present in this file
+
+  gigSourcesApplied = true;
+}
+
+function addUnique(list, items = []) {
+  for (const item of items || []) {
+    if (typeof item === 'string' && item.trim() && !list.includes(item.trim())) {
+      list.push(item.trim());
+    }
+  }
+}
+
 
 function stripHtml(html = '') {
   return String(html)
@@ -117,6 +148,7 @@ function stripHtml(html = '') {
 }
 
 function scoreLead(lead) {
+  applyGigSourcesConfig();
   const haystack = `${lead.title} ${lead.company} ${lead.location} ${lead.description} ${(lead.tags || []).join(' ')}`.toLowerCase();
   let score = 0;
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { spawnSync } from 'child_process';
 import { paths } from './lib/workops-paths.mjs';
@@ -16,6 +16,7 @@ function argValue(name, fallback) {
 const max = argValue('--max', '200');
 const maxEval = Number.parseInt(argValue('--max-eval', argValue('--eval-top', '8')), 10);
 const evalMinScore = Number.parseInt(argValue('--eval-min-score', '75'), 10);
+const shortlistMinScore = Number.parseInt(argValue('--shortlist-min-score', '60'), 10);
 const minutes = Number.parseFloat(argValue('--minutes', '8'));
 const model = argValue('--model', process.env.GEMINI_MODEL_GIGS || process.env.GEMINI_MODEL || 'gemini-3.5-flash');
 const includeEvaluated = args.includes('--include-evaluated');
@@ -365,6 +366,7 @@ const shortlist = leads
     shortlist_score: bonusScore(lead),
     reason: reason(lead),
   }))
+  .filter((lead) => lead.shortlist_score >= shortlistMinScore)
   .sort((a, b) => b.shortlist_score - a.shortlist_score)
   .slice(0, 50);
 
@@ -380,6 +382,7 @@ const lines = [
   `Selected: ${shortlist.length}`,
   `Evaluated leads skipped: ${includeEvaluated ? 'no' : 'yes'}`,
   `Auto-eval threshold: ${evalMinScore}`,
+  `Shortlist minimum score: ${shortlistMinScore}`,
   '',
   '| Rank | Score | Source | Company | Title | Location | Why | URL |',
   '|---:|---:|---|---|---|---|---|---|',
