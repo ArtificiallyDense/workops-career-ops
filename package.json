@@ -25,7 +25,8 @@
                     "workops:gig-shortlist":  "node workops-gig-shortlist.mjs",
                     "workops:gig-cycle":  "node workops-gig-cycle.mjs",
                     "workops:gig-hunt":  "node workops-gig-cycle.mjs --max 250 --max-eval 8 --eval-min-score 75 --minutes 10 --model gemini-3.5-flash",
-                    "workops:top-picks":  "node workops-top-picks.mjs"
+                    "workops:top-picks":  "node workops-top-picks.mjs",
+                    "workops:apply-pack":  "node workops-apply-pack.mjs"
                 },
     "keywords":  [
                      "ai",
