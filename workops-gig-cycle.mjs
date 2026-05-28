@@ -62,6 +62,57 @@ function runNode(script, scriptArgs = []) {
   }
 }
 
+function runNodeSoft(script, scriptArgs = []) {
+  if (!existsSync(script)) {
+    console.error(`Missing script: ${script}`);
+    return { status: 1 };
+  }
+
+  const result = spawnSync(process.execPath, [script, ...scriptArgs], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  if (result.error) {
+    console.error(result.error.message);
+    return { status: 1 };
+  }
+
+  return { status: result.status ?? 1 };
+}
+
+function slugify(value) {
+  return String(value || 'lead')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90);
+}
+
+function writeLeadJdFile(lead) {
+  const dir = join(process.cwd(), 'jds');
+  mkdirSync(dir, { recursive: true });
+
+  const filename = `${slugify(`${lead.company || 'company'}-${lead.title || 'role'}`)}-serpapi.txt`;
+  const path = join(dir, filename);
+
+  const body = [
+    `Company: ${lead.company || ''}`,
+    `Role: ${lead.title || ''}`,
+    `Source: ${lead.source || ''}`,
+    `Location: ${lead.location || ''}`,
+    `URL: ${lead.url || ''}`,
+    `Apply URL: ${lead.apply_url || lead.url || ''}`,
+    `Tags: ${(lead.tags || []).join(', ')}`,
+    '',
+    'Job Description:',
+    lead.description || '',
+  ].join('\n');
+
+  writeFileSync(path, body, 'utf8');
+  return path;
+}
+
 function clean(value) {
   return String(value || '')
     .replace(/\*\*/g, '')
@@ -131,6 +182,15 @@ function textOf(lead) {
 
 function titleOf(lead) {
   return String(lead.title || '').toLowerCase();
+}
+
+const obviousBadTitleRegex = /growth manager|performance marketing manager|customer support|customer success|sales manager|account executive|business development|e[- ]?commerce growth manager/i;
+
+function shortlistKey(lead) {
+  return `${lead.company || ''}|${lead.title || ''}`
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const hardGood = [
@@ -274,6 +334,12 @@ const hardBad = [
   'intern',
   'internship',
   'city scout',
+  'growth manager',
+  'performance marketing manager',
+  'customer support specialist',
+  'customer support',
+  'e commerce growth manager',
+  'e-commerce growth manager',
   'minijob',
   'düsseldorf',
   'duesseldorf',
@@ -335,7 +401,13 @@ function reason(lead) {
 }
 
 console.log('Step 1/4: Discover wider gig/job leads...');
-runNode('workops-gig-discover.mjs', ['--max', max, ...(args.includes('--serpapi') ? ['--serpapi'] : [])]);
+runNode('workops-gig-discover.mjs', [
+  '--max',
+  max,
+  ...(args.includes('--serpapi') ? ['--serpapi'] : []),
+  ...(args.includes('--serpapi-limit') ? ['--serpapi-limit', argValue('--serpapi-limit', '10')] : []),
+  ...(args.includes('--serpapi-location') ? ['--serpapi-location', argValue('--serpapi-location', 'United States')] : []),
+]);
 
 const leadsPath = join(paths.dataDir, 'gig-leads.json');
 if (!existsSync(leadsPath)) {
@@ -355,6 +427,7 @@ const shortlist = leads
     const text = textOf(lead);
 
     if (hardBad.some((bad) => title.includes(bad))) return false;
+    if (obviousBadTitleRegex.test(title)) return false;
     if (weakTerms.some((term) => text.includes(term))) return false;
     if (/proofreader|pharmaceutical|medical|physio|founders associate|city scout|working student|werkstudent|praktikant|praktikum|internship|native german|german speaker|deutsch|remote in de/i.test(text)) return false;
     if (!hardGood.some((good) => text.includes(good))) return false;
@@ -367,6 +440,7 @@ const shortlist = leads
     reason: reason(lead),
   }))
   .filter((lead) => lead.shortlist_score >= shortlistMinScore)
+  .filter((lead, index, all) => all.findIndex((other) => shortlistKey(other) === shortlistKey(lead)) === index)
   .sort((a, b) => b.shortlist_score - a.shortlist_score)
   .slice(0, 50);
 
@@ -431,8 +505,15 @@ for (const [index, lead] of selected.entries()) {
   console.log(`Shortlist score: ${lead.shortlist_score}`);
   console.log(lead.url);
 
-  runNode('workops-eval-url.mjs', [lead.url, '--model', model]);
-  evaluated++;
+  const evalResult = String(lead.source || '').toLowerCase().includes('serpapi')
+    ? runNodeSoft('gemini-eval.mjs', ['--file', writeLeadJdFile(lead), '--model', model])
+    : runNodeSoft('workops-eval-url.mjs', [lead.url, '--model', model]);
+
+  if (evalResult.status === 0) {
+    evaluated++;
+  } else {
+    console.warn(`Evaluation skipped/failed but hunt will continue: ${lead.company} — ${lead.title}`);
+  }
 }
 
 console.log('');

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { config } from 'dotenv';
 import { join } from 'path';
 import { paths } from './lib/workops-paths.mjs';
 import yaml from 'js-yaml';
+
+config();
 
 const args = process.argv.slice(2);
 
@@ -13,6 +16,9 @@ function argValue(name, fallback) {
 }
 
 const max = Number.parseInt(argValue('--max', '80'), 10);
+const includeSerpApi = args.includes('--serpapi') || Boolean(process.env.SERPAPI_API_KEY);
+const serpApiLimit = Number.parseInt(argValue('--serpapi-limit', '10'), 10);
+const serpApiLocation = argValue('--serpapi-location', 'United States');
 
 const goodKeywords = [
   'graphic designer', 'brand designer', 'logo', 'poster', 'flyer', 'pamphlet',
@@ -110,6 +116,21 @@ function loadGigSources() {
     return {};
   }
 }
+
+const serpQueries = [];
+
+const defaultSerpQueries = [
+  'remote freelance graphic designer',
+  'remote logo designer freelance',
+  'remote social media designer freelance',
+  'remote canva designer freelance',
+  'remote brand designer contract',
+  'remote packaging designer freelance',
+  'remote youtube thumbnail designer',
+  'remote product image editor',
+  'remote ecommerce designer freelance',
+  'remote AI creative producer'
+];
 
 let gigSourcesApplied = false;
 
@@ -218,10 +239,72 @@ async function collectArbeitnow() {
   }));
 }
 
+
+async function collectSerpApi() {
+  applyGigSourcesConfig();
+
+  const apiKey = process.env.SERPAPI_API_KEY;
+  if (!apiKey) {
+    console.warn('  skipped SerpApi: SERPAPI_API_KEY missing');
+    return [];
+  }
+
+  const all = [];
+  if (serpQueries.length === 0) {
+    addUnique(serpQueries, defaultSerpQueries);
+  }
+
+  const queries = (serpQueries || []).slice(0, serpApiLimit);
+
+  console.log(`  SerpApi queries: ${queries.length}/${serpQueries.length}`);
+
+  for (const query of queries) {
+    const url = new URL('https://serpapi.com/search.json');
+    url.searchParams.set('engine', 'google_jobs');
+    url.searchParams.set('q', query);
+    url.searchParams.set('location', serpApiLocation);
+    url.searchParams.set('hl', 'en');
+    url.searchParams.set('gl', 'us');
+    url.searchParams.set('api_key', apiKey);
+
+    try {
+      const data = await fetchJson(url.toString(), `SerpApi ${query}`);
+      const jobs = data.jobs_results || [];
+
+      for (const item of jobs) {
+        all.push({
+          source: 'SerpApi Google Jobs',
+          title: item.title || '',
+          company: item.company_name || '',
+          location: item.location || '',
+          url: (item.apply_options && item.apply_options[0] && item.apply_options[0].link) || item.share_link || '',
+          apply_url: (item.apply_options && item.apply_options[0] && item.apply_options[0].link) || item.share_link || '',
+          job_id: item.job_id || '',
+          tags: item.extensions || [],
+          date: item.detected_extensions?.posted_at || '',
+          description: stripHtml(item.description || ''),
+        });
+      }
+    } catch (error) {
+      console.error(`  SerpApi query skipped: ${query} — ${error.message}`);
+    }
+  }
+
+  return all;
+}
+
 const collectors = [
   ['RemoteOK', collectRemoteOk],
   ['Arbeitnow', collectArbeitnow],
 ];
+
+console.log(`SerpApi enabled: ${includeSerpApi ? 'yes' : 'no'}`);
+console.log(`SerpApi key present: ${process.env.SERPAPI_API_KEY ? 'yes' : 'no'}`);
+console.log(`SerpApi location: ${serpApiLocation}`);
+
+if (includeSerpApi) {
+  collectors.push(['SerpApi', collectSerpApi]);
+}
 
 const collected = [];
 
