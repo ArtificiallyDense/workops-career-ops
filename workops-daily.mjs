@@ -167,7 +167,10 @@ if (!skipPackages) {
 }
 
 console.log('');
-console.log('Step 5/5: Writing daily summary...');
+console.log('Step 5/6: Generating pay estimates...');
+runNode('workops-pay-estimate.mjs', ['--top', String(topPacks)]);
+
+console.log('Step 6/6: Writing daily summary...');
 
 const summary = [
   '# WorkOps Daily Summary',
@@ -186,6 +189,7 @@ const summary = [
   `- Opportunity review: ${join(runsRoot, 'opportunity-review.md')}`,
   `- Packages folder: ${packagesDir}`,
   `- Apply packs folder: ${applyPacksDir}`,
+  `- Pay estimates: ${join(runsRoot, 'pay-estimates.md')}`,
   '',
   '## Next Human Action',
   '',
