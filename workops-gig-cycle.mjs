@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { spawnSync } from 'child_process';
 import { paths } from './lib/workops-paths.mjs';
 
@@ -253,6 +253,9 @@ const hardBad = [
   'intern',
   'internship',
   'city scout',
+  'minijob',
+  'düsseldorf',
+  'duesseldorf',
   'gerente de opera'
 ];
 
@@ -413,4 +416,4 @@ runNode('workops-review.mjs');
 
 console.log('');
 console.log('Gig hunt complete.');
-console.log(`Review: ${join(paths.runsDir, 'opportunity-review.md')}`);
+console.log(`Review: ${join(dirname(paths.reportsDir), 'opportunity-review.md')}`);
