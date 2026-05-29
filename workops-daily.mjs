@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -17,20 +17,36 @@ const max = argValue('--max', '250');
 const maxEval = argValue('--max-eval', '8');
 const evalMinScore = argValue('--eval-min-score', '75');
 const minutes = argValue('--minutes', '10');
-const topPacks = Number.parseInt(argValue('--top-packs', '5'), 10);
+const topPacks = Number.parseInt(argValue('--top-packs', '12'), 10);
 
 const skipHunt = args.includes('--skip-hunt');
 const skipPackages = args.includes('--skip-packages');
+const forcePackages = args.includes('--force-packages');
+const skipPay = args.includes('--skip-pay');
+const skipQueue = args.includes('--skip-queue');
 
 const runsRoot = dirname(paths.reportsDir);
 const packagesDir = join(runsRoot, 'packages');
 const applyPacksDir = join(runsRoot, 'apply-packs');
 const topPicksPath = join(runsRoot, 'opportunity-top-picks.md');
 const dailyPath = join(runsRoot, 'daily-summary.md');
+const payPath = join(runsRoot, 'pay-estimates.md');
+const applyQueuePath = join(runsRoot, 'today-apply-queue.md');
 
-function runNode(script, scriptArgs = []) {
+const failures = [];
+const skipped = [];
+const created = [];
+
+function runNode(script, scriptArgs = [], options = {}) {
+  const soft = Boolean(options.soft);
+
   if (!existsSync(script)) {
-    console.error(`Missing script: ${script}`);
+    const message = `Missing script: ${script}`;
+    if (soft) {
+      console.warn(message);
+      return { ok: false, status: 1 };
+    }
+    console.error(message);
     process.exit(1);
   }
 
@@ -44,20 +60,33 @@ function runNode(script, scriptArgs = []) {
 
   if (result.error) {
     console.error(result.error.message);
-    process.exit(1);
+    return { ok: false, status: 1 };
   }
 
-  if ((result.status ?? 1) !== 0) {
-    process.exit(result.status ?? 1);
+  const status = result.status ?? 1;
+  const ok = status === 0;
+
+  if (!ok && !soft) {
+    process.exit(status);
   }
+
+  return { ok, status };
 }
 
 function slugify(value) {
   return String(value || '')
     .toLowerCase()
+    .replace(/â€“|â€”|–|—/g, '-')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 90);
+}
+
+function clean(value) {
+  return String(value || '')
+    .replace(/â€“|â€”|–|—/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function parseTopPicks() {
@@ -66,7 +95,7 @@ function parseTopPicks() {
   return readFileSync(topPicksPath, 'utf8')
     .split(/\r?\n/)
     .filter((line) => line.startsWith('|') && !line.includes('---:') && !line.includes('Rank |'))
-    .map((line) => line.split('|').map((part) => part.trim()).filter(Boolean))
+    .map((line) => line.split('|').map((part) => clean(part)).filter(Boolean))
     .map((parts) => ({
       rank: parts[0],
       company: parts[1],
@@ -80,6 +109,33 @@ function parseTopPicks() {
     .slice(0, topPacks);
 }
 
+function findApplyPackDir(company, role) {
+  if (!existsSync(applyPacksDir)) return null;
+
+  const folders = readdirSync(applyPacksDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  const companySlug = slugify(company);
+  const roleSlug = slugify(role);
+
+  const ranked = folders
+    .map((folder) => {
+      let score = 0;
+      if (folder.includes(companySlug)) score += 10;
+
+      for (const part of roleSlug.split('-').filter((p) => p.length > 3)) {
+        if (folder.includes(part)) score += 1;
+      }
+
+      return { folder, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return ranked[0] ? join(applyPacksDir, ranked[0].folder) : null;
+}
+
 function latestPackageFor(company, role) {
   if (!existsSync(packagesDir)) return null;
 
@@ -88,46 +144,66 @@ function latestPackageFor(company, role) {
 
   const files = readdirSync(packagesDir)
     .filter((name) => name.endsWith('-package.md'))
-    .map((name) => ({
-      name,
-      path: join(packagesDir, name),
-      score:
-        (name.includes(companySlug) ? 2 : 0) +
-        (name.includes(roleSlug.slice(0, 35)) ? 1 : 0),
-      mtime: statSync(join(packagesDir, name)).mtimeMs,
-    }))
+    .map((name) => {
+      const path = join(packagesDir, name);
+      return {
+        name,
+        path,
+        score:
+          (name.includes(companySlug) ? 4 : 0) +
+          roleSlug.split('-').filter((p) => p.length > 3 && name.includes(p)).length,
+        mtime: statSync(path).mtimeMs,
+      };
+    })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || b.mtime - a.mtime);
 
   return files[0]?.name || null;
 }
 
+function discoverArgs() {
+  return [
+    '--max',
+    max,
+    '--max-eval',
+    maxEval,
+    '--eval-min-score',
+    evalMinScore,
+    '--minutes',
+    minutes,
+    '--model',
+    model,
+    ...(args.includes('--serpapi') ? ['--serpapi'] : []),
+    ...(args.includes('--serpapi-limit') ? ['--serpapi-limit', argValue('--serpapi-limit', '10')] : []),
+    ...(args.includes('--serpapi-location') ? ['--serpapi-location', argValue('--serpapi-location', 'United States')] : []),
+  ];
+}
+
 console.log('WorkOps Daily');
 console.log('=============');
 console.log(`Model: ${model}`);
 console.log(`Top packs: ${topPacks}`);
+console.log(`Force packages: ${forcePackages ? 'yes' : 'no'}`);
 
 if (!skipHunt) {
   console.log('');
-  console.log('Step 1/5: Hunting for fresh gigs/opportunities...');
-  runNode('workops-gig-cycle.mjs', [
-    '--max', max,
-    '--max-eval', maxEval,
-    '--eval-min-score', evalMinScore,
-    '--minutes', minutes,
-    '--model', model,
-  ]);
+  console.log('Step 1/6: Hunting for fresh gigs/opportunities...');
+  const result = runNode('workops-gig-cycle.mjs', discoverArgs(), { soft: true });
+
+  if (!result.ok) {
+    failures.push('Gig hunt failed or partially failed. Continuing with existing reports.');
+  }
 } else {
   console.log('');
-  console.log('Step 1/5: Skipping hunt.');
+  console.log('Step 1/6: Skipping hunt.');
 }
 
 console.log('');
-console.log('Step 2/5: Updating review...');
+console.log('Step 2/6: Updating review...');
 runNode('workops-review.mjs');
 
 console.log('');
-console.log('Step 3/5: Generating top picks...');
+console.log('Step 3/6: Generating top picks...');
 runNode('workops-top-picks.mjs');
 
 const picks = parseTopPicks();
@@ -142,35 +218,82 @@ console.log(`Top picks found: ${picks.length}`);
 
 if (!skipPackages) {
   console.log('');
-  console.log('Step 4/5: Generating packages and apply-packs...');
+  console.log('Step 4/6: Ensuring packages and apply-packs exist...');
 
   mkdirSync(packagesDir, { recursive: true });
   mkdirSync(applyPacksDir, { recursive: true });
 
   for (const pick of picks) {
-    console.log('');
-    console.log(`Packaging: ${pick.company} — ${pick.role}`);
+    const existingApplyPack = findApplyPackDir(pick.company, pick.role);
 
-    runNode('workops-package.mjs', [pick.report, '--model', model]);
-
-    const packageFile = latestPackageFor(pick.company, pick.role);
-    if (!packageFile) {
-      console.warn(`Could not find package file for ${pick.company} — ${pick.role}`);
+    if (existingApplyPack && !forcePackages) {
+      console.log('');
+      console.log(`Skipping existing apply pack: ${pick.company} — ${pick.role}`);
+      skipped.push(`${pick.company} — ${pick.role}`);
       continue;
     }
 
-    runNode('workops-apply-pack.mjs', [packageFile]);
+    console.log('');
+    console.log(`Packaging: ${pick.company} — ${pick.role}`);
+
+    const packageResult = runNode('workops-package.mjs', [pick.report, '--model', model], { soft: true });
+
+    if (!packageResult.ok) {
+      console.warn(`Package failed, continuing: ${pick.company} — ${pick.role}`);
+      failures.push(`Package failed: ${pick.company} — ${pick.role}`);
+      continue;
+    }
+
+    const packageFile = latestPackageFor(pick.company, pick.role);
+
+    if (!packageFile) {
+      console.warn(`Could not find package file for ${pick.company} — ${pick.role}`);
+      failures.push(`Package file not found: ${pick.company} — ${pick.role}`);
+      continue;
+    }
+
+    const applyPackResult = runNode('workops-apply-pack.mjs', [packageFile], { soft: true });
+
+    if (!applyPackResult.ok) {
+      failures.push(`Apply pack failed: ${pick.company} — ${pick.role}`);
+      continue;
+    }
+
+    created.push(`${pick.company} — ${pick.role}`);
   }
 } else {
   console.log('');
-  console.log('Step 4/5: Skipping packages.');
+  console.log('Step 4/6: Skipping packages.');
+}
+
+if (!skipPay) {
+  console.log('');
+  console.log('Step 5/6: Generating pay estimates...');
+  const result = runNode('workops-pay-estimate.mjs', ['--top', String(topPacks)], { soft: true });
+
+  if (!result.ok) {
+    failures.push('Pay estimate generation failed.');
+  }
+} else {
+  console.log('');
+  console.log('Step 5/6: Skipping pay estimates.');
+}
+
+if (!skipQueue) {
+  console.log('');
+  console.log('Step 6/6: Generating apply queue...');
+  const result = runNode('workops-apply-queue.mjs', ['--top', String(topPacks)], { soft: true });
+
+  if (!result.ok) {
+    failures.push('Apply queue generation failed.');
+  }
+} else {
+  console.log('');
+  console.log('Step 6/6: Skipping apply queue.');
 }
 
 console.log('');
-console.log('Step 5/6: Generating pay estimates...');
-runNode('workops-pay-estimate.mjs', ['--top', String(topPacks)]);
-
-console.log('Step 6/6: Writing daily summary...');
+console.log('Writing daily summary...');
 
 const summary = [
   '# WorkOps Daily Summary',
@@ -187,13 +310,21 @@ const summary = [
   '',
   `- Top picks: ${topPicksPath}`,
   `- Opportunity review: ${join(runsRoot, 'opportunity-review.md')}`,
+  `- Pay estimates: ${payPath}`,
+  `- Apply queue: ${applyQueuePath}`,
   `- Packages folder: ${packagesDir}`,
   `- Apply packs folder: ${applyPacksDir}`,
-  `- Pay estimates: ${join(runsRoot, 'pay-estimates.md')}`,
   '',
+  '## Package Status',
+  '',
+  `- Created/refreshed this run: ${created.length}`,
+  `- Skipped existing apply-packs: ${skipped.length}`,
+  `- Failures: ${failures.length}`,
+  '',
+  ...(failures.length ? ['### Failures', '', ...failures.map((item) => `- ${item}`), ''] : []),
   '## Next Human Action',
   '',
-  'Review the top apply-pack folders and submit only the strongest matches first.',
+  'Open today-apply-queue.md and apply only the A-list first.',
   '',
 ].join('\n');
 
@@ -205,4 +336,11 @@ console.log('');
 console.log('Done. Review these:');
 console.log(`- ${topPicksPath}`);
 console.log(`- ${dailyPath}`);
+console.log(`- ${payPath}`);
+console.log(`- ${applyQueuePath}`);
 console.log(`- ${applyPacksDir}`);
+
+if (failures.length) {
+  console.log('');
+  console.log('Completed with non-fatal failures. See daily summary.');
+}

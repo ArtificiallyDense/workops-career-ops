@@ -28,7 +28,8 @@
                     "workops:top-picks":  "node workops-top-picks.mjs",
                     "workops:apply-pack":  "node workops-apply-pack.mjs",
                     "workops:daily":  "node workops-daily.mjs",
-                    "workops:pay-estimate":  "node workops-pay-estimate.mjs"
+                    "workops:pay-estimate":  "node workops-pay-estimate.mjs",
+                    "workops:apply-queue":  "node workops-apply-queue.mjs"
                 },
     "keywords":  [
                      "ai",
