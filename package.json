@@ -35,7 +35,11 @@
                     "workops:profile:init":  "node workops-profile.mjs init",
                     "workops:profile:list":  "node workops-profile.mjs list",
                     "workops:profile:show":  "node workops-profile.mjs show",
-                    "workops:profile:set":  "node workops-profile.mjs set"
+                    "workops:profile:set":  "node workops-profile.mjs set",
+                    "workops:workspace:init":  "node workops-workspace.mjs init",
+                    "workops:workspace:list":  "node workops-workspace.mjs list",
+                    "workops:workspace:show":  "node workops-workspace.mjs show",
+                    "workops:workspace:set":  "node workops-workspace.mjs set"
                 },
     "keywords":  [
                      "ai",
