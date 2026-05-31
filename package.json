@@ -31,7 +31,11 @@
                     "workops:pay-estimate":  "node workops-pay-estimate.mjs",
                     "workops:apply-queue":  "node workops-apply-queue.mjs",
                     "workops:select":  "node workops-select.mjs",
-                    "workops:queue-health":  "node workops-queue-health.mjs"
+                    "workops:queue-health":  "node workops-queue-health.mjs",
+                    "workops:profile:init":  "node workops-profile.mjs init",
+                    "workops:profile:list":  "node workops-profile.mjs list",
+                    "workops:profile:show":  "node workops-profile.mjs show",
+                    "workops:profile:set":  "node workops-profile.mjs set"
                 },
     "keywords":  [
                      "ai",

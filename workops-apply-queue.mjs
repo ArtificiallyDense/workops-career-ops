@@ -24,6 +24,18 @@ const applyPacksDir = join(runsRoot, 'apply-packs');
 const mdOutputPath = join(runsRoot, 'today-apply-queue.md');
 const jsonOutputPath = join(runsRoot, 'today-apply-queue.json');
 
+function loadActiveProfile() {
+  const profilePath = join(paths.dataDir, 'profiles', 'active-profile.json');
+
+  if (!existsSync(profilePath)) return null;
+
+  try {
+    return JSON.parse(readFileSync(profilePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function clean(value) {
   return String(value || '')
     .replace(/â€“|â€”|–|—/g, '-')
@@ -325,6 +337,8 @@ function statusFor(priority) {
   return 'Backlog';
 }
 
+const activeProfile = loadActiveProfile();
+
 const qualified = parseQualified();
 const payMap = parsePayEstimates();
 
@@ -368,6 +382,7 @@ const rows = qualified.map((pick) => {
 
 const summary = {
   schema_version: '1.0',
+  active_profile: activeProfile ? { id: activeProfile.id, name: activeProfile.name } : null,
   generated: new Date().toISOString(),
   source: existsSync(qualifiedPath) ? qualifiedPath : topPicksPath,
   max,
@@ -386,6 +401,7 @@ const md = [
   '# WorkOps Apply Queue',
   '',
   `Generated: ${summary.generated}`,
+  `Active profile: ${activeProfile?.name || 'None'}`,
   `Source: ${summary.source}`,
   '',
   '## Daily Rule',

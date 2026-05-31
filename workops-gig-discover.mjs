@@ -106,6 +106,19 @@ const badKeywords = [
 ];
 
 
+function loadActiveProfile() {
+  const profilePath = join(paths.dataDir, 'profiles', 'active-profile.json');
+
+  if (!existsSync(profilePath)) return {};
+
+  try {
+    return JSON.parse(readFileSync(profilePath, 'utf8')) || {};
+  } catch (error) {
+    console.warn(`Could not load active profile: ${error.message}`);
+    return {};
+  }
+}
+
 function loadGigSources() {
   const configPath = join(paths.dataDir, 'config', 'gig-sources.yml');
   if (!existsSync(configPath)) return {};
@@ -137,6 +150,7 @@ let gigSourcesApplied = false;
 function applyGigSourcesConfig() {
   if (gigSourcesApplied) return;
   const gigSources = loadGigSources();
+  const activeProfile = loadActiveProfile();
 
   addUnique(goodKeywords, gigSources.positive_terms);
   addUnique(goodKeywords, gigSources.context_terms);
@@ -301,6 +315,7 @@ const collectors = [
 console.log(`SerpApi enabled: ${includeSerpApi ? 'yes' : 'no'}`);
 console.log(`SerpApi key present: ${process.env.SERPAPI_API_KEY ? 'yes' : 'no'}`);
 console.log(`SerpApi location: ${serpApiLocation}`);
+console.log(`Active profile: ${activeProfile?.id || 'none'}`);
 
 if (includeSerpApi) {
   collectors.push(['SerpApi', collectSerpApi]);

@@ -38,6 +38,18 @@ const failures = [];
 const skipped = [];
 const created = [];
 
+function loadActiveProfile() {
+  const profilePath = join(paths.dataDir, 'profiles', 'active-profile.json');
+
+  if (!existsSync(profilePath)) return null;
+
+  try {
+    return JSON.parse(readFileSync(profilePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function runNode(script, scriptArgs = [], options = {}) {
   const soft = Boolean(options.soft);
 
@@ -180,10 +192,13 @@ function discoverArgs() {
   ];
 }
 
+const activeProfile = loadActiveProfile();
+
 console.log('WorkOps Daily');
 console.log('=============');
 console.log(`Model: ${model}`);
 console.log(`Top packs: ${topPacks}`);
+console.log(`Active profile: ${activeProfile?.name || 'None'}`);
 console.log(`Force packages: ${forcePackages ? 'yes' : 'no'}`);
 
 if (!skipHunt) {
