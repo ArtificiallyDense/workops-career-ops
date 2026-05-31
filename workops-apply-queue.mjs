@@ -188,17 +188,22 @@ function actionFor(priority, row) {
 function suggestedProof(row) {
   const text = `${row.company} ${row.role} ${row.why} ${row.roleClass}`.toLowerCase();
 
+  if (/sports|apparel|gear|muay thai|fight|combat|merchandise|federation|equipment/.test(text)) return 'IFMA / MTG / World Muaythai Council sports apparel, gear, event assets, and international production proof';
   if (/thumbnail|youtube|podcast|sweet fish/.test(text)) return 'World of Sports + Space Cats motion/social examples + thumbnail-style layout proof';
   if (/linjer|tarte|fable|fashion|cosmetic|beauty|skincare|jewelry|bag|home/.test(text)) return 'Farida Waller + Zaha Vintage + premium ecommerce/product visuals';
   if (/logo|brand style|brand guide|brand kit/.test(text)) return 'Best logo/brand identity examples + one clean brand-system mockup';
   if (/canva|social media|instagram|facebook|reels|tiktok/.test(text)) return 'Social media post pack, reel cover, Canva/Adobe template examples';
-  if (/ai creative|elevenlabs|generative|midjourney|comfyui/.test(text)) return 'AI workflow proof: ComfyUI/Midjourney/Adobe pipeline + before/after visuals';
+  if (/ai creative|elevenlabs|generative|midjourney|comfyui|web3|nft|crypto/.test(text)) return 'AI workflow proof: ComfyUI/Midjourney/Adobe pipeline + Web3/NFT hybrid media proof + before/after visuals';
   if (/writer|content/.test(text)) return 'Visual-first LinkedIn carousel or AI workflow explainer';
   return 'Pick 1-2 closest Behance examples and mention exact relevance';
 }
 
 function personalizationAngle(row) {
   const text = `${row.company} ${row.role} ${row.why}`.toLowerCase();
+
+  if (/sports|apparel|gear|muay thai|fight|combat|merchandise|federation|equipment/.test(text)) {
+    return 'Mention international sports/apparel production proof, apparel/gear design, and production-ready visual systems.';
+  }
 
   if (/sweet fish|thumbnail/.test(text)) {
     return 'Mention brand-building thumbnails/content packaging and how you can create repeatable visual systems.';
