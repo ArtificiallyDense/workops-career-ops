@@ -20,6 +20,7 @@ const useWeb = args.includes('--web');
 const webQueriesPerRole = Number.parseInt(argValue('--web-queries', '1'), 10);
 const runsRoot = dirname(paths.reportsDir);
 const topPicksPath = join(runsRoot, 'opportunity-top-picks.md');
+const qualifiedPath = join(runsRoot, 'qualified-opportunities.json');
 const applyPacksDir = join(runsRoot, 'apply-packs');
 const summaryPath = join(runsRoot, 'pay-estimates.md');
 const payConfigPath = join(paths.dataDir, 'config', 'pay-ranges.yml');
@@ -162,6 +163,25 @@ const defaultBand = payConfig.default || {
   retainer: [800, 3500],
   note: 'General remote creative freelance range.',
 };
+
+function parseQualifiedPicks() {
+  if (!existsSync(qualifiedPath)) return null;
+
+  const payload = JSON.parse(readFileSync(qualifiedPath, 'utf8'));
+
+  return (payload.rows || [])
+    .map((row, index) => ({
+      rank: String(row.rank || index + 1),
+      company: String(row.company || ''),
+      role: String(row.role || ''),
+      score: String(row.score || ''),
+      decision: String(row.decision || ''),
+      why: String(row.archetype || row.why || ''),
+      report: String(row.report || ''),
+    }))
+    .filter((row) => row.company && row.role && row.report && row.report.endsWith('.md'))
+    .slice(0, top);
+}
 
 function parseTopPicks() {
   if (!existsSync(topPicksPath)) {
@@ -487,7 +507,7 @@ function writeEstimate(applyPackDir, pick, estimate, webEvidence) {
   return file;
 }
 
-const picks = parseTopPicks();
+const picks = args.includes('--qualified') ? (parseQualifiedPicks() || parseTopPicks()) : parseTopPicks();
 const summary = [
   '# WorkOps Pay Estimates',
   '',

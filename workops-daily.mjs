@@ -18,6 +18,7 @@ const maxEval = argValue('--max-eval', '8');
 const evalMinScore = argValue('--eval-min-score', '75');
 const minutes = argValue('--minutes', '10');
 const topPacks = Number.parseInt(argValue('--top-packs', '12'), 10);
+const queueMax = Number.parseInt(argValue('--queue-max', '50'), 10);
 
 const skipHunt = args.includes('--skip-hunt');
 const skipPackages = args.includes('--skip-packages');
@@ -206,6 +207,10 @@ console.log('');
 console.log('Step 3/6: Generating top picks...');
 runNode('workops-top-picks.mjs');
 
+console.log('');
+console.log('Selecting qualified opportunities...');
+runNode('workops-select.mjs', ['--min-score', argValue('--min-score', '4.1'), '--max', String(queueMax)], { soft: true });
+
 const picks = parseTopPicks();
 
 if (picks.length === 0) {
@@ -269,7 +274,7 @@ if (!skipPackages) {
 if (!skipPay) {
   console.log('');
   console.log('Step 5/6: Generating pay estimates...');
-  const result = runNode('workops-pay-estimate.mjs', ['--top', String(topPacks)], { soft: true });
+  const result = runNode('workops-pay-estimate.mjs', ['--top', String(queueMax), '--qualified'], { soft: true });
 
   if (!result.ok) {
     failures.push('Pay estimate generation failed.');
@@ -282,11 +287,15 @@ if (!skipPay) {
 if (!skipQueue) {
   console.log('');
   console.log('Step 6/6: Generating apply queue...');
-  const result = runNode('workops-apply-queue.mjs', ['--top', String(topPacks)], { soft: true });
+  const result = runNode('workops-apply-queue.mjs', ['--max', String(queueMax)], { soft: true });
 
   if (!result.ok) {
     failures.push('Apply queue generation failed.');
   }
+
+  console.log('Running queue health check...');
+  const healthResult = runNode('workops-queue-health.mjs', [], { soft: true });
+  if (!healthResult.ok) failures.push('Queue health check failed.');
 } else {
   console.log('');
   console.log('Step 6/6: Skipping apply queue.');
@@ -310,8 +319,10 @@ const summary = [
   '',
   `- Top picks: ${topPicksPath}`,
   `- Opportunity review: ${join(runsRoot, 'opportunity-review.md')}`,
+  `- Qualified opportunities: ${join(runsRoot, 'qualified-opportunities.md')}`,
   `- Pay estimates: ${payPath}`,
   `- Apply queue: ${applyQueuePath}`,
+  `- Queue health: ${join(runsRoot, 'queue-health.md')}`,
   `- Packages folder: ${packagesDir}`,
   `- Apply packs folder: ${applyPacksDir}`,
   '',

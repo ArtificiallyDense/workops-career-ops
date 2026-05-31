@@ -11,11 +11,13 @@ function argValue(name, fallback) {
   return index >= 0 ? args[index + 1] : fallback;
 }
 
-const top = Number.parseInt(argValue('--top', '12'), 10);
+const max = Number.parseInt(argValue('--max', argValue('--top', '50')), 10);
 const aLimit = Number.parseInt(argValue('--a-limit', '3'), 10);
-const bLimit = Number.parseInt(argValue('--b-limit', '6'), 10);
+const minA = Number.parseFloat(argValue('--min-a', '4.6'));
+const minB = Number.parseFloat(argValue('--min-b', '4.3'));
 
 const runsRoot = dirname(paths.reportsDir);
+const qualifiedPath = join(runsRoot, 'qualified-opportunities.json');
 const topPicksPath = join(runsRoot, 'opportunity-top-picks.md');
 const payEstimatesPath = join(runsRoot, 'pay-estimates.md');
 const applyPacksDir = join(runsRoot, 'apply-packs');
@@ -33,6 +35,15 @@ function safeCell(value) {
   return clean(value).replace(/\|/g, '/');
 }
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/â€“|â€”|–|—/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90);
+}
+
 function normalizeApplyPackPath(value) {
   const cleaned = clean(value);
   if (!cleaned) return '';
@@ -47,47 +58,52 @@ function compensationPathFor(applyPack) {
   return join(applyPack, '10-compensation-estimate.md');
 }
 
-function linkRisk(url) {
-  const value = clean(url).toLowerCase();
-  if (!value) return 'Missing apply URL - open report/apply pack.';
-  if (value.includes('indeed.com')) return 'Indeed link may be gated/blocked - search company careers if it fails.';
-  if (value.includes('google.com/search')) return 'Google Jobs link - prefer direct apply URL if available.';
-  if (value.includes('upwork.com')) return 'Marketplace link - use short proposal and verify client/budget.';
-  if (value.includes('linkedin.com')) return 'LinkedIn link - may require login; verify posting freshness.';
-  return 'Normal link.';
-}
-
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/â€“|â€”|–|—/g, '-')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 90);
-}
-
 function parseMarkdownTable(path) {
   if (!existsSync(path)) return [];
 
   return readFileSync(path, 'utf8')
     .split(/\r?\n/)
     .filter((line) => line.startsWith('|') && !line.includes('---:') && !line.includes('Rank |'))
-    .map((line) => line.split('|').map((part) => part.trim()).filter(Boolean));
+    .map((line) => line.split('|').map((part) => clean(part)).filter(Boolean));
 }
 
-function parseTopPicks() {
+function parseTopPicksFallback() {
   return parseMarkdownTable(topPicksPath)
     .map((parts) => ({
       rank: Number.parseInt(parts[0], 10),
       company: clean(parts[1]),
       role: clean(parts[2]),
-      score: clean(parts[3]),
+      score: Number.parseFloat(parts[3]) || 0,
       decision: clean(parts[4]),
       why: clean(parts[5]),
       report: clean(parts[6]),
+      applyUrl: '',
+      linkRisk: 'missing',
     }))
     .filter((row) => row.report && row.report.endsWith('.md'))
-    .slice(0, top);
+    .slice(0, max);
+}
+
+function parseQualified() {
+  if (!existsSync(qualifiedPath)) return parseTopPicksFallback();
+
+  const payload = JSON.parse(readFileSync(qualifiedPath, 'utf8'));
+
+  return (payload.rows || [])
+    .map((row, index) => ({
+      rank: Number.parseInt(row.rank || index + 1, 10),
+      company: clean(row.company),
+      role: clean(row.role),
+      score: Number.parseFloat(row.score) || 0,
+      decision: clean(row.decision),
+      why: clean(row.why || row.archetype || ''),
+      report: clean(row.report),
+      applyUrl: clean(row.applyUrl || ''),
+      linkRisk: clean(row.linkRisk || ''),
+      dedupeKey: clean(row.dedupeKey || ''),
+    }))
+    .filter((row) => row.company && row.role && row.report)
+    .slice(0, max);
 }
 
 function parsePayEstimates() {
@@ -104,7 +120,7 @@ function parsePayEstimates() {
       project: clean(parts[6]),
       retainer: clean(parts[7]),
       confidence: clean(parts[8]),
-      applyPack: clean(parts[9]),
+      applyPack: normalizeApplyPackPath(clean(parts[9])),
     };
 
     map.set(`${row.company}||${row.role}`.toLowerCase(), row);
@@ -113,12 +129,15 @@ function parsePayEstimates() {
   return map;
 }
 
-function reportPathFor(pick) {
-  return join(paths.reportsDir, pick.report.replace(/^reports[\\/]/, ''));
+function reportPathFor(row) {
+  if (!row.report) return '';
+  return join(paths.reportsDir, row.report.replace(/^reports[\\/]/, ''));
 }
 
-function extractUrlFromReport(pick) {
-  const reportPath = reportPathFor(pick);
+function extractUrlFromReport(row) {
+  if (row.applyUrl) return row.applyUrl;
+
+  const reportPath = reportPathFor(row);
   if (!existsSync(reportPath)) return '';
 
   const text = readFileSync(reportPath, 'utf8');
@@ -128,6 +147,29 @@ function extractUrlFromReport(pick) {
     text.match(/Apply URL:\s*(https?:\/\/\S+)/i);
 
   return match ? match[1].trim() : '';
+}
+
+function linkRiskCode(url, fallback = '') {
+  if (fallback) return fallback;
+
+  const value = clean(url).toLowerCase();
+  if (!value) return 'missing';
+  if (value.includes('indeed.com')) return 'gated';
+  if (value.includes('google.com/search')) return 'google-jobs';
+  if (value.includes('upwork.com') || value.includes('hourspent.com') || value.includes('contra.com')) return 'marketplace';
+  if (value.includes('linkedin.com')) return 'login';
+  return 'normal';
+}
+
+function linkRiskText(code) {
+  const value = clean(code).toLowerCase();
+
+  if (value === 'missing') return 'Missing apply URL - open report/apply pack.';
+  if (value === 'gated') return 'Indeed/board link may be gated or blocked - search company careers if it fails.';
+  if (value === 'google-jobs') return 'Google Jobs link - prefer direct apply URL if available.';
+  if (value === 'marketplace') return 'Marketplace link - use short proposal and verify client/budget.';
+  if (value === 'login') return 'Login-gated link - verify posting freshness.';
+  return 'Normal link.';
 }
 
 function findApplyPack(company, role) {
@@ -157,44 +199,79 @@ function findApplyPack(company, role) {
   return ranked[0] ? join(applyPacksDir, ranked[0].folder) : '';
 }
 
-function priorityFor(pick, index) {
-  const score = Number.parseFloat(pick.score) || 0;
-  const decision = pick.decision.toLowerCase();
+function canBeA(row, aCount) {
+  const decision = clean(row.decision).toLowerCase();
+  const risk = clean(row.linkRiskCode).toLowerCase();
 
-  if (index < aLimit && decision.includes('act now') && score >= 4.5) return 'A';
-  if (index < bLimit && (decision.includes('act now') || decision.includes('strong maybe')) && score >= 4.1) return 'B';
+  if (aCount >= aLimit) return false;
+  if (row.score < minA) return false;
+  if (!(decision.includes('act now') || decision.includes('strong maybe'))) return false;
+  if (risk === 'missing' || risk === 'login' || risk === 'google-jobs') return false;
+
+  return true;
+}
+
+function priorityFor(row, aCount) {
+  const decision = clean(row.decision).toLowerCase();
+
+  if (canBeA(row, aCount)) return 'A';
+
+  // B-list is "review next", not "everything qualified".
+  if (row.score >= minB) return 'B';
+
+  // Act Now below B threshold is still worth reviewing unless link is terrible.
+  if (decision.includes('act now') && row.score >= 4.1) return 'B';
+
   return 'C';
 }
 
 function submissionStyle(priority, row) {
   const text = `${row.company} ${row.role}`.toLowerCase();
 
+  if (priority === 'A' && /upwork|hourspent|contra|logo|brand style/.test(text)) return 'High-quality short marketplace proposal';
   if (priority === 'A') return 'Highly personalized application / proposal';
-  if (/upwork|hourspent|logo|brand style/.test(text)) return 'Short marketplace proposal';
+  if (/upwork|hourspent|contra|logo|brand style/.test(text)) return 'Short marketplace proposal';
   if (priority === 'B') return 'Semi-personalized application';
   return 'Backlog / save for later';
 }
 
 function actionFor(priority, row) {
-  const text = `${row.company} ${row.role}`.toLowerCase();
-
-  if (priority === 'A' && /indeed|google jobs/.test(text)) return 'Verify direct apply link, then customize and apply today';
   if (priority === 'A') return 'Apply today after customizing opening paragraph';
-  if (priority === 'B' && /upwork|hourspent|logo|canva|freelance/.test(text)) return 'Quick pitch if link is easy';
-  if (priority === 'B') return 'Review after A-list';
+  if (priority === 'B') return 'Review after A-list / apply if quick';
   return 'Do not apply today unless very fast';
 }
 
 function suggestedProof(row) {
   const text = `${row.company} ${row.role} ${row.why} ${row.roleClass}`.toLowerCase();
 
-  if (/sports|apparel|gear|muay thai|fight|combat|merchandise|federation|equipment/.test(text)) return 'IFMA / MTG / World Muaythai Council sports apparel, gear, event assets, and international production proof';
-  if (/thumbnail|youtube|podcast|sweet fish/.test(text)) return 'World of Sports + Space Cats motion/social examples + thumbnail-style layout proof';
-  if (/linjer|tarte|fable|fashion|cosmetic|beauty|skincare|jewelry|bag|home/.test(text)) return 'Farida Waller + Zaha Vintage + premium ecommerce/product visuals';
-  if (/logo|brand style|brand guide|brand kit/.test(text)) return 'Best logo/brand identity examples + one clean brand-system mockup';
-  if (/canva|social media|instagram|facebook|reels|tiktok/.test(text)) return 'Social media post pack, reel cover, Canva/Adobe template examples';
-  if (/ai creative|elevenlabs|generative|midjourney|comfyui|web3|nft|crypto/.test(text)) return 'AI workflow proof: ComfyUI/Midjourney/Adobe pipeline + Web3/NFT hybrid media proof + before/after visuals';
-  if (/writer|content/.test(text)) return 'Visual-first LinkedIn carousel or AI workflow explainer';
+  if (/sports|apparel|gear|muay thai|fight|combat|merchandise|federation|equipment/.test(text)) {
+    return 'IFMA / MTG / World Muaythai Council sports apparel, gear, event assets, and international production proof';
+  }
+
+  if (/thumbnail|youtube|podcast|sweet fish/.test(text)) {
+    return 'World of Sports + Space Cats motion/social examples + thumbnail-style layout proof';
+  }
+
+  if (/linjer|tarte|fable|fashion|cosmetic|beauty|skincare|jewelry|bag|home|parachute/.test(text)) {
+    return 'Farida Waller + Zaha Vintage + premium ecommerce/product visuals';
+  }
+
+  if (/logo|brand style|brand guide|brand kit/.test(text)) {
+    return 'Best logo/brand identity examples + one clean brand-system mockup';
+  }
+
+  if (/canva|social media|instagram|facebook|reels|tiktok/.test(text)) {
+    return 'Social media post pack, reel cover, Canva/Adobe template examples';
+  }
+
+  if (/ai creative|elevenlabs|generative|midjourney|comfyui|web3|nft|crypto/.test(text)) {
+    return 'AI workflow proof: ComfyUI/Midjourney/Adobe pipeline + Web3/NFT hybrid media proof + before/after visuals';
+  }
+
+  if (/writer|content/.test(text)) {
+    return 'Visual-first LinkedIn carousel or AI workflow explainer';
+  }
+
   return 'Pick 1-2 closest Behance examples and mention exact relevance';
 }
 
@@ -209,7 +286,7 @@ function personalizationAngle(row) {
     return 'Mention brand-building thumbnails/content packaging and how you can create repeatable visual systems.';
   }
 
-  if (/linjer|tarte|fable|fashion|cosmetic|beauty|skincare|jewelry|bags|home brand/.test(text)) {
+  if (/linjer|tarte|fable|fashion|cosmetic|beauty|skincare|jewelry|bags|home|parachute/.test(text)) {
     return 'Mention premium ecommerce/lifestyle visuals and connect Farida Waller or Zaha Vintage to their product category.';
   }
 
@@ -235,18 +312,10 @@ function personalizationAngle(row) {
 function humanSignal(row) {
   const text = `${row.company} ${row.role}`.toLowerCase();
 
-  if (/upwork|hourspent/.test(text)) {
-    return 'Reference the exact deliverable they requested and propose a first milestone.';
-  }
-
-  if (/tarte|linjer|fable|parachute|home|cosmetic|beauty|fashion/.test(text)) {
-    return 'Mention their product/category aesthetic before talking about your tools.';
-  }
-
-  if (/sweet fish|media|thumbnail/.test(text)) {
-    return 'Mention content packaging, hooks, and repeatable thumbnail systems.';
-  }
-
+  if (/upwork|hourspent|contra/.test(text)) return 'Reference the exact deliverable they requested and propose a first milestone.';
+  if (/tarte|linjer|fable|parachute|home|cosmetic|beauty|fashion/.test(text)) return 'Mention their product/category aesthetic before talking about your tools.';
+  if (/sweet fish|media|thumbnail/.test(text)) return 'Mention content packaging, hooks, and repeatable thumbnail systems.';
+  if (/sports|apparel|gear|muay thai|fight|combat/.test(text)) return 'Mention your international sports/apparel production experience.';
   return 'Mention one specific thing about their project/company before introducing yourself.';
 }
 
@@ -256,48 +325,68 @@ function statusFor(priority) {
   return 'Backlog';
 }
 
-const picks = parseTopPicks();
+const qualified = parseQualified();
 const payMap = parsePayEstimates();
 
-const rows = picks.map((pick, index) => {
-  const pay = payMap.get(`${pick.company}||${pick.role}`.toLowerCase()) || {};
-  const base = { ...pick, ...pay };
-  const priority = priorityFor(pick, index);
-  const applyPack = normalizeApplyPackPath(pay.applyPack || findApplyPack(pick.company, pick.role));
-  const url = extractUrlFromReport(pick);
+let aCount = 0;
 
-  return {
-    priority,
-    rank: pick.rank,
-    company: pick.company,
-    role: pick.role,
-    score: pick.score,
-    decision: pick.decision,
-    why: pick.why,
+const rows = qualified.map((pick) => {
+  const pay = payMap.get(`${pick.company}||${pick.role}`.toLowerCase()) || {};
+  const applyUrl = extractUrlFromReport(pick);
+  const linkRiskCodeValue = linkRiskCode(applyUrl, pick.linkRisk);
+  const applyPack = normalizeApplyPackPath(pay.applyPack || findApplyPack(pick.company, pick.role));
+
+  const base = {
+    ...pick,
     roleClass: pay.roleClass || '',
     payTarget: pay.target || '',
     hourly: pay.hourly || '',
     project: pay.project || '',
     retainer: pay.retainer || '',
     compensationConfidence: pay.confidence || '',
+    applyUrl,
+    linkRiskCode: linkRiskCodeValue,
+    linkRisk: linkRiskText(linkRiskCodeValue),
+    applyPack,
+    compensationFile: compensationPathFor(applyPack),
+  };
+
+  const priority = priorityFor(base, aCount);
+  if (priority === 'A') aCount += 1;
+
+  return {
+    ...base,
+    priority,
     action: actionFor(priority, base),
     submissionStyle: submissionStyle(priority, base),
     status: statusFor(priority),
     humanSignal: humanSignal(base),
     personalizationAngle: personalizationAngle(base),
     suggestedProof: suggestedProof(base),
-    applyUrl: url,
-    linkRisk: linkRisk(url),
-    applyPack,
-    compensationFile: compensationPathFor(applyPack),
-    report: pick.report,
   };
 });
+
+const summary = {
+  schema_version: '1.0',
+  generated: new Date().toISOString(),
+  source: existsSync(qualifiedPath) ? qualifiedPath : topPicksPath,
+  max,
+  a_limit: aLimit,
+  min_a: minA,
+  min_b: minB,
+  counts: {
+    total: rows.length,
+    a: rows.filter((r) => r.priority === 'A').length,
+    b: rows.filter((r) => r.priority === 'B').length,
+    c: rows.filter((r) => r.priority === 'C').length,
+  },
+};
 
 const md = [
   '# WorkOps Apply Queue',
   '',
-  `Generated: ${new Date().toISOString()}`,
+  `Generated: ${summary.generated}`,
+  `Source: ${summary.source}`,
   '',
   '## Daily Rule',
   '',
@@ -305,9 +394,9 @@ const md = [
   '',
   '## Priority System',
   '',
-  '- **A:** Apply today with real personalization. Limit: top 3 by default.',
-  '- **B:** Good lead. Semi-personalize or apply after A-list.',
-  '- **C:** Backlog. Save unless it is very fast.',
+  `- **A:** Apply today with real personalization. Limit: ${aLimit}.`,
+  `- **B:** Qualified / review next. Score usually ${minB}+ or strong decision.`,
+  '- **C:** Qualified backlog. Save unless it is very fast or strategically useful.',
   '',
   '## Today Queue',
   '',
@@ -355,7 +444,9 @@ for (const row of rows) {
 }
 
 writeFileSync(mdOutputPath, md.join('\n'), 'utf8');
-writeFileSync(jsonOutputPath, JSON.stringify({ generated: new Date().toISOString(), rows }, null, 2) + '\n', 'utf8');
+writeFileSync(jsonOutputPath, JSON.stringify({ ...summary, rows }, null, 2) + '\n', 'utf8');
 
+console.log(`Apply queue rows: ${rows.length}`);
+console.log(`A: ${summary.counts.a}, B: ${summary.counts.b}, C: ${summary.counts.c}`);
 console.log(`Apply queue saved: ${mdOutputPath}`);
 console.log(`Apply queue JSON saved: ${jsonOutputPath}`);
