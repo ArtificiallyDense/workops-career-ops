@@ -61,31 +61,37 @@ function cvChoice(job) {
 
 function proofBullets(job) {
   const proof = safe(job.proofAngle).toLowerCase();
+  const title = safe(job.title).toLowerCase();
 
-  if (/hotel|resort|f&b leadership|outlets/.test(proof)) {
+  if (/hotel|resort|f&b leadership|outlets|food and beverage/.test(proof) || /director of food|food and beverage director|outlets manager/.test(title)) {
     return [
-      'Shangrila Resorts & Hotel: Acting GM / F&B Manager experience covering F&B operations, guest service, staffing, and daily hotel operations.',
-      'IRIS Eco Resort and Pinnacle Executive Lodges: resort/property operations, guest satisfaction, maintenance coordination, and team leadership.',
-      'Food Fund International / The Meat Co Dubai: premium restaurant operations, stock control, internal audit, and brand-opening exposure.',
-      'GCC experience across UAE and Saudi Arabia with multicultural teams and demanding hospitality environments.'
+      'Shangrila Resorts & Hotel: Acting GM / F&B Manager experience across F&B operations, guest service, staffing, daily hotel operations, and service quality.',
+      'IRIS Eco Resort and Pinnacle Executive Lodges: resort/property operations, guest satisfaction, maintenance coordination, staff supervision, and operational efficiency.',
+      'Food Fund International / The Meat Co Dubai: premium restaurant operations, stock control, internal audit, inventory reporting, and brand-opening exposure.',
+      'Regulus Restaurants UAE: procurement, sourcing, vendor coordination, inventory reporting, warehouse support, and cost-control processes.',
+      'Burgerizzer Riyadh: supported multi-branch restaurant operations and improved kitchen workflow/cooking time.',
+      '20+ years across hospitality operations, F&B, restaurants, hotels/resorts, procurement, cost control, and team leadership.'
     ];
   }
 
-  if (/multi-unit|burgerizzer|restaurant operations/.test(proof)) {
+  if (/multi-unit|burgerizzer|restaurant operations|cluster/.test(proof) || /cluster|restaurant managers|restaurant manager/.test(title)) {
     return [
-      'Burgerizzer Riyadh: opened 12 branches and supported regional operations/development.',
-      'Reduced kitchen cooking time from 20 minutes to 7 minutes through workflow improvement.',
-      'Regulus Restaurants UAE and Food Fund / Meat Co Dubai: pre-opening, multi-brand restaurant operations, procurement, and BOH systems.',
-      '20+ years across hospitality operations, F&B, restaurants, hotels/resorts, procurement, and cost control.'
+      'Burgerizzer Riyadh: supported regional operations and development, including the opening of 12 branches.',
+      'Improved kitchen workflow and reduced cooking time from 20 minutes to 7 minutes through operational process improvement.',
+      'Regulus Restaurants UAE: procurement, admin, HR support, vendor coordination, inventory, warehouse, and pre-opening support.',
+      'Food Fund International / The Meat Co Dubai: stock control, internal audit, BOH systems, and opening support for multiple restaurant brands.',
+      'Experience managing multicultural teams, daily service standards, operational readiness, cost awareness, and branch-level performance.',
+      '20+ years across restaurant operations, F&B, hotel/resort operations, procurement, inventory, and cost control.'
     ];
   }
 
-  if (/procurement|cost control|inventory|sourcing/.test(proof)) {
+  if (/procurement|cost control|inventory|sourcing/.test(proof) || /procurement|supply chain|inventory|cost control/.test(title)) {
     return [
       'Regulus Restaurants UAE: procurement, sourcing, food/equipment purchasing, vendor coordination, inventory, and warehouse support.',
-      'Food Fund / Meat Co Dubai: stock control, internal audit, inventory reporting, and operational controls.',
-      'Data Sweets & Bakers: operational turnaround using ERP, staff training, process control, and cost/performance improvement.',
-      'Hands-on experience across front-of-house, back-of-house, procurement, cost control, and operations.'
+      'Food Fund / The Meat Co Dubai: stock control, internal audit, inventory reporting, and operational controls.',
+      'Data Sweets & Bakers: operational turnaround using ERP, staff training, process control, recipe improvements, and cost/performance improvement.',
+      'Practical experience across front-of-house, back-of-house, purchasing, inventory, reporting, and operations.',
+      'GCC hospitality experience across UAE and Saudi Arabia with demanding restaurant and F&B environments.'
     ];
   }
 
@@ -98,13 +104,42 @@ function proofBullets(job) {
 }
 
 function coverOpening(job) {
+  const title = safe(job.title);
+  const company = safe(job.company);
+  const proof = safe(job.proofAngle);
+  const lowerTitle = title.toLowerCase();
+
+  if (/director of food|food and beverage director|outlets manager|hotel|resort|f&b/.test(lowerTitle)) {
+    return `Dear Hiring Team,
+
+I am applying for the ${title} role at ${company}. I am a senior hospitality operations and F&B management professional with 20+ years of experience across UAE, Saudi Arabia, and Pakistan, with a practical background in hotel/resort operations, F&B leadership, restaurant operations, procurement, cost control, guest experience, and team supervision.
+
+For this role, my strongest match is ${proof}. I have held hotel/resort and F&B management responsibilities, supported premium restaurant operations in Dubai, worked across stock control and internal audit, and contributed to pre-opening and operational setup for multiple restaurant brands in the UAE.
+
+I would bring hands-on operational discipline, service-quality focus, cost awareness, team leadership, and GCC hospitality experience to your F&B operation.
+
+Kind regards,
+Babar Aslam Abbasi`;
+  }
+
+  if (/cluster|restaurant manager|restaurant managers|general manager/.test(lowerTitle)) {
+    return `Dear Hiring Team,
+
+I am applying for the ${title} role with ${company}. My background is strongest in multi-unit restaurant operations, pre-opening execution, team development, cost control, and practical restaurant systems across Saudi Arabia, UAE, and Pakistan.
+
+In Riyadh, I supported regional operations and development for Burgerizzer, including the opening of 12 branches and workflow improvements that reduced kitchen cooking time from 20 minutes to 7 minutes. In the UAE, I worked across procurement, administration, HR support, stock control, internal audit, and pre-opening operations with Regulus Restaurants and Food Fund International / The Meat Co.
+
+For this role, I would bring hands-on experience in branch readiness, service standards, BOH/FOH coordination, staff training, vendor coordination, cost control, and day-to-day operational discipline.
+
+Kind regards,
+Babar Aslam Abbasi`;
+  }
+
   return `Dear Hiring Team,
 
-I am writing to apply for the ${safe(job.title)} role at ${safe(job.company)}. I am a senior hospitality operations and F&B management professional with 20+ years of experience across UAE, Saudi Arabia, and Pakistan, including restaurant operations, hotel/resort operations, pre-opening projects, procurement, cost control, team training, and multi-unit leadership.
+I am writing to apply for the ${title} role at ${company}. I am a senior hospitality operations and F&B management professional with 20+ years of experience across UAE, Saudi Arabia, and Pakistan, including restaurant operations, hotel/resort operations, pre-opening projects, procurement, cost control, team training, and multi-unit leadership.
 
-For this role, my strongest match is ${safe(job.proofAngle)}. I have opened and supported multiple hospitality operations, including 12 Burgerizzer branches in Riyadh, pre-opening work for restaurant brands in the UAE, and hotel/resort operations experience focused on guest satisfaction, team leadership, operational efficiency, and cost control.
-
-I would welcome the opportunity to discuss how my background can support your operation, team performance, guest experience, and profitability.
+For this role, my strongest match is ${proof}. I would welcome the opportunity to discuss how my background can support your operation, team performance, guest experience, and profitability.
 
 Kind regards,
 Babar Aslam Abbasi`;
@@ -113,12 +148,41 @@ Babar Aslam Abbasi`;
 function recruiterMessage(job) {
   return `Hello,
 
-I am interested in the ${safe(job.title)} opportunity with ${safe(job.company)}. I have 20+ years of hospitality operations and F&B management experience across UAE, Saudi Arabia, and Pakistan, with strengths in restaurant operations, hotel/resort operations, pre-opening, procurement, cost control, team leadership, and multi-unit operations.
+I am interested in the ${safe(job.title)} opportunity with ${safe(job.company)}. I have 20+ years of hospitality operations and F&B management experience across UAE, Saudi Arabia, and Pakistan, including restaurant operations, hotel/resort operations, pre-opening, procurement, cost control, team leadership, and multi-unit operations.
 
 My strongest match for this role is ${safe(job.proofAngle)}. I would be happy to share my CV and discuss whether my background fits the role requirements.
 
 Best regards,
 Babar Aslam Abbasi`;
+}
+
+function shortFormAnswers(job) {
+  return `# Short Form Answers
+
+## Why are you a good fit for this role?
+
+I have 20+ years of hospitality operations and F&B management experience across UAE, Saudi Arabia, and Pakistan. My background includes restaurant operations, hotel/resort operations, pre-opening projects, procurement, cost control, team training, stock control, internal audit, and multi-unit operations. For this role, my strongest match is ${safe(job.proofAngle)}.
+
+## Most relevant achievements
+
+- Supported opening of 12 Burgerizzer branches in Riyadh.
+- Improved kitchen workflow and reduced cooking time from 20 minutes to 7 minutes.
+- Supported pre-opening and operational setup for restaurant brands in the UAE.
+- Worked across procurement, stock control, internal audit, inventory, warehouse, and operational reporting.
+- Managed hotel/resort and F&B operations with focus on guest satisfaction, team leadership, service standards, and operational efficiency.
+
+## Salary expectation
+
+Open to a fair market package based on role scope, country, visa support, accommodation/benefits, and total responsibility. Current estimate for this role: ${safe(job.payEstimate)}.
+
+## Visa / relocation
+
+Open to relocation for the right international hospitality opportunity. Visa sponsorship or company visa support can be discussed during the process.
+
+## 500-character summary
+
+Senior hospitality operations and F&B management professional with 20+ years across UAE, Saudi Arabia, and Pakistan. Experience includes multi-unit restaurant operations, hotel/resort operations, pre-opening, procurement, cost control, team leadership, stock control, internal audit, and operational turnaround.
+`;
 }
 
 function writePack(job, index) {
@@ -204,6 +268,8 @@ ${job.visaRisk === 'Medium' ? 'Visa/sponsorship is not clearly stated. Do not as
 
 ${recruiterMessage(job)}
 `, 'utf8');
+
+  writeFileSync(join(folder, '07-short-form-answers.md'), shortFormAnswers(job), 'utf8');
 
   return {
     folder,
