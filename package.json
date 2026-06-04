@@ -1,4 +1,4 @@
-﻿{
+{
     "name":  "career-ops",
     "version":  "1.8.1",
     "description":  "AI-powered job search pipeline built on Claude Code",
@@ -42,7 +42,9 @@
                     "workops:workspace:set":  "node workops-workspace.mjs set",
                     "workops:babar-hunt":  "node workops-babar-hunt.mjs",
                     "workops:babar-polish":  "node workops-babar-polish.mjs",
-                    "workops:babar-apply-packs":  "node workops-babar-apply-packs.mjs"
+                    "workops:babar-apply-packs":  "node workops-babar-apply-packs.mjs",
+                    "workops:money-plan":  "node workops-money-plan.mjs",
+                    "workops:proof-match":  "node workops-proof-match.mjs"
                 },
     "keywords":  [
                      "ai",

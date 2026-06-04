@@ -311,6 +311,14 @@ if (!skipQueue) {
   console.log('Running queue health check...');
   const healthResult = runNode('workops-queue-health.mjs', [], { soft: true });
   if (!healthResult.ok) failures.push('Queue health check failed.');
+
+  console.log('Generating money plan...');
+  const moneyResult = runNode('workops-money-plan.mjs', [], { soft: true });
+  if (!moneyResult.ok) failures.push('Money plan generation failed.');
+
+  console.log('Generating proof match...');
+  const proofResult = runNode('workops-proof-match.mjs', [], { soft: true });
+  if (!proofResult.ok) failures.push('Proof match generation failed.');
 } else {
   console.log('');
   console.log('Step 6/6: Skipping apply queue.');
@@ -338,6 +346,8 @@ const summary = [
   `- Pay estimates: ${payPath}`,
   `- Apply queue: ${applyQueuePath}`,
   `- Queue health: ${join(runsRoot, 'queue-health.md')}`,
+  `- Money plan: ${join(runsRoot, 'money-plan.md')}`,
+  `- Proof match: ${join(runsRoot, 'proof-match.md')}`,
   `- Packages folder: ${packagesDir}`,
   `- Apply packs folder: ${applyPacksDir}`,
   '',
