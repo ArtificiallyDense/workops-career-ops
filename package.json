@@ -40,7 +40,8 @@
                     "workops:workspace:list":  "node workops-workspace.mjs list",
                     "workops:workspace:show":  "node workops-workspace.mjs show",
                     "workops:workspace:set":  "node workops-workspace.mjs set",
-                    "workops:babar-hunt":  "node workops-babar-hunt.mjs"
+                    "workops:babar-hunt":  "node workops-babar-hunt.mjs",
+                    "workops:babar-polish":  "node workops-babar-polish.mjs"
                 },
     "keywords":  [
                      "ai",
