@@ -46,6 +46,15 @@ function slug(value) {
     .slice(0, 80);
 }
 
+function shortSlug(value, max = 36) {
+  return safe(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, max)
+    .replace(/-+$/g, '');
+}
+
 function xml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -587,7 +596,7 @@ const rows = [];
 
 for (const [i, job] of queue.entries()) {
   const rank = String(i + 1).padStart(2, '0');
-  const folderName = `${rank}_${job.priority}_${slug(job.company)}_${slug(job.title)}`;
+  const folderName = `${rank}_${job.priority}_${shortSlug(job.company, 32)}_${shortSlug(job.title, 42)}`;
   const folder = join(packageRoot, priorityFolder(job), folderName);
   const cv = cvChoice(job);
 
