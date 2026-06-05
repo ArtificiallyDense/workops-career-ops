@@ -141,6 +141,13 @@ function qualityGate(job) {
   let score = Number(job.score || 0);
   const flags = [];
 
+  const titleText = safe(job.title).toLowerCase();
+
+  if (/\bcfo\b|chief financial|finance director|financial controller|accountant|accounting|comptroller|head of finance/.test(titleText)) {
+    score -= 80;
+    flags.push('wrong function - finance/accounting role');
+  }
+
   const source = job.sourceQuality || 'Other';
   const tier = roleTier(job);
 

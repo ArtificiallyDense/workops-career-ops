@@ -1,4 +1,4 @@
-{
+﻿{
     "name":  "career-ops",
     "version":  "1.8.1",
     "description":  "AI-powered job search pipeline built on Claude Code",
@@ -44,7 +44,10 @@
                     "workops:babar-polish":  "node workops-babar-polish.mjs",
                     "workops:babar-apply-packs":  "node workops-babar-apply-packs.mjs",
                     "workops:money-plan":  "node workops-money-plan.mjs",
-                    "workops:proof-match":  "node workops-proof-match.mjs"
+                    "workops:proof-match":  "node workops-proof-match.mjs",
+                    "workops:babar-happy-meal":  "node workops-babar-happy-meal.mjs",
+                    "workops:babar-application-pack":  "node workops-babar-application-pack.mjs",
+                    "workops:babar-ai-review":  "node workops-babar-ai-review.mjs"
                 },
     "keywords":  [
                      "ai",
@@ -53,7 +56,7 @@
                      "career",
                      "automation"
                  ],
-    "author":  "Santiago FernÃ¡ndez de Valderrama \u003chi@santifer.io\u003e (https://santifer.io)",
+    "author":  "Santiago FernÃƒÂ¡ndez de Valderrama \u003chi@santifer.io\u003e (https://santifer.io)",
     "homepage":  "https://santifer.io",
     "repository":  {
                        "type":  "git",
